@@ -1,7 +1,6 @@
 #!/bin/sh
 #SBATCH --time=00:15:00
 #SBATCH -N 1
-#SBATCH -C TitanX
 #SBATCH --gres=gpu:1
 
 . /etc/bashrc
@@ -9,5 +8,5 @@
 
 module load opencl-nvidia/10.0
 
-./bfs /home/tanand/rodinia_3.1/data/bfs/graph1MW_6.txt
+./bfs
 

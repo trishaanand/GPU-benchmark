@@ -58,7 +58,6 @@ __kernel void edgelist( const __global Node* g_graph_nodes,
 					__global char* g_graph_mask, 
 					__global char* g_updating_graph_mask, 
 					__global char* g_graph_visited, 
-					__global int* g_cost, 
 					const  int no_of_edges,
 					__global char* g_over,
 					__global int * g_depth,
@@ -70,7 +69,8 @@ __kernel void edgelist( const __global Node* g_graph_nodes,
 
 		int new_depth = *g_depth + 1;
 		
-		if (atomic_min(&g_level[g_graph_edges[tid].out_vertex], new_depth) > new_depth) { //atomic min returns the old value
+		if (atomic_min(&g_level[g_graph_edges[tid].out_vertex], new_depth) > new_depth) {
+			 //atomic min returns the old value
 			//if the depth seen by a node is higher than the current new depth, we should try more depths
 			*g_over=true;
 		}
@@ -83,7 +83,6 @@ __kernel void reverse_edgelist( const __global Node* g_graph_nodes,
 					__global char* g_graph_mask, 
 					__global char* g_updating_graph_mask, 
 					__global char* g_graph_visited, 
-					__global int* g_cost, 
 					const  int no_of_edges,
 					__global char* g_over,
 					__global int * g_depth,
@@ -95,9 +94,61 @@ __kernel void reverse_edgelist( const __global Node* g_graph_nodes,
 
 		int new_depth = *g_depth + 1;
 		
-		if (atomic_min(&g_level[g_graph_edges[tid].in_vertex], new_depth) > new_depth) { //atomic min returns the old value
+		if (atomic_min(&g_level[g_graph_edges[tid].in_vertex], new_depth) > new_depth) {
+			 //atomic min returns the old value
 			//if the depth seen by a node is higher than the current new depth, we should try more depths
 			*g_over=true;
+		}
+	}	
+}
+
+//--7 parameters
+__kernel void vertex_push( const __global Node* g_graph_nodes,
+					const __global Edge* g_graph_edges, 
+					const  int no_of_nodes,
+					__global char* g_over,
+					__global int * g_depth,
+					__global int* g_level,
+					const __global int* g_neighbours) {
+
+	int tid = get_global_id(0);
+
+	if( (tid<no_of_nodes) && (g_level[tid]==*g_depth) ){
+
+		int new_depth = *g_depth + 1;
+		int starting = g_graph_nodes[tid].starting;
+		int max = starting + g_graph_nodes[tid].no_of_edges;
+		for (int i=starting; i<max; i++ ) {
+			if (atomic_min(&g_level[g_neighbours[i]], new_depth) > new_depth) {
+				//atomic min returns the old value
+				//if the depth seen by a node is higher than the current new depth, we should try more depths
+				*g_over=true;
+			}
+		}
+	}	
+}
+
+//--7 parameters
+__kernel void vertex_pull( const __global Node* g_graph_nodes,
+					const __global Edge* g_graph_edges, 
+					const  int no_of_nodes,
+					__global char* g_over,
+					__global int * g_depth,
+					__global int* g_level,
+					const __global int* g_reverse_neighbours) {
+
+	int tid = get_global_id(0);
+	int new_depth = *g_depth + 1;
+	if( (tid<no_of_nodes) && (g_level[tid] > new_depth) ){
+
+		int starting = g_graph_nodes[tid].starting;
+		int max = starting + g_graph_nodes[tid].no_of_edges;
+		for (int i=starting; i<max; i++ ) {
+			if (g_level[g_reverse_neighbours[i]] == g_depth) {
+				g_level[tid] = new_depth;
+				*g_over = true;
+				break;
+			}
 		}
 	}	
 }

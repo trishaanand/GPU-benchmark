@@ -7,6 +7,8 @@
 #include <cstring>
 #include <cstdint>
 #include <climits>
+#include <sstream>
+#include <algorithm>
 
 #ifdef  PROFILING
 #include "timer.h"
@@ -29,6 +31,13 @@ struct Edge {
 	int out_vertex;
 };
 
+bool edge_compare(Edge lhs, Edge rhs) {
+	return (lhs.in_vertex < rhs.in_vertex);
+}
+
+bool edge_compare_reverse(Edge lhs, Edge rhs) {
+	return (lhs.out_vertex < rhs.out_vertex);
+}
 
 //----------------------------------------------------------
 //--bfs on cpu
@@ -185,7 +194,7 @@ void run_bfs_gpu_rodinia(int no_of_nodes, Node *h_graph_nodes, int edge_list_siz
 //----------------------------------------------------------
 void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, \
 		Edge *h_graph_edges, char *h_graph_mask, char *h_updating_graph_mask, \
-		char *h_graph_visited, int *h_cost) 
+		char *h_graph_visited, bool reverse)
 					throw(std::string){
 
 	//int number_elements = height*width;
@@ -196,10 +205,11 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 	for (int i=0; i< no_of_nodes; i++) {
 		h_level[i] = INT_MAX;
 	}
-	h_level[0] = 0; //Setting source as zero -> Assumption that zeroth index is the source. Change in case the source is read from the input
+	h_level[0] = 0; //Setting source as zero -> Assumption that zeroth index is the source. 
+	//Change in case the source is read from the input
 
 	cl_mem d_graph_nodes, d_graph_edges, d_graph_mask, d_updating_graph_mask, \
-			d_graph_visited, d_cost, d_over, d_depth, d_level;
+			d_graph_visited, d_over, d_depth, d_level;
 	try{
 		//--1 transfer data from host to device
 		_clInit();	
@@ -209,7 +219,6 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		d_updating_graph_mask = _clMallocRW(no_of_nodes*sizeof(char), h_updating_graph_mask);
 		d_graph_visited = _clMallocRW(no_of_nodes*sizeof(char), h_graph_visited);
 
-		d_cost = _clMallocRW(no_of_nodes*sizeof(int), h_cost);
 		d_over = _clMallocRW(sizeof(char), &h_over);
 		d_depth = _clMallocRW(sizeof(int), &h_depth);
 
@@ -220,7 +229,6 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		_clMemcpyH2D(d_graph_mask, no_of_nodes*sizeof(char), h_graph_mask);	
 		_clMemcpyH2D(d_updating_graph_mask, no_of_nodes*sizeof(char), h_updating_graph_mask);	
 		_clMemcpyH2D(d_graph_visited, no_of_nodes*sizeof(char), h_graph_visited);	
-		_clMemcpyH2D(d_cost, no_of_nodes*sizeof(int), h_cost);	
 		_clMemcpyH2D(d_level, no_of_nodes*sizeof(int), h_level);
 			
 		//--2 invoke kernel
@@ -236,15 +244,19 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 			
 			_clMemcpyH2D(d_over, sizeof(char), &h_over);
 			_clMemcpyH2D(d_depth, sizeof(int), &h_depth);
-			//--kernel 0
-			int kernel_id = 2;
+			
+			int kernel_id;
+			if (reverse == true) {
+				kernel_id = 3;
+			} else {
+				kernel_id = 2;
+			}
 			int kernel_idx = 0;
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_mask);
 			_clSetArgs(kernel_id, kernel_idx++, d_updating_graph_mask);
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_visited);
-			_clSetArgs(kernel_id, kernel_idx++, d_cost);
 			_clSetArgs(kernel_id, kernel_idx++, &edge_list_size, sizeof(int));
 			_clSetArgs(kernel_id, kernel_idx++, d_over);
 			_clSetArgs(kernel_id, kernel_idx++, d_depth);
@@ -262,7 +274,7 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		kernel_time = kernel_timer.getTimeInSeconds();
 #endif
 		//--3 transfer data from device to host
-		_clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_cost);//copying level data into cost
+		// _clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_cost);//copying level data into cost
 
 		//--statistics
 #ifdef	PROFILING
@@ -274,7 +286,6 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		_clFree(d_graph_mask);
 		_clFree(d_updating_graph_mask);
 		_clFree(d_graph_visited);
-		_clFree(d_cost);
 		_clFree(d_over);
 		_clRelease();
 	}
@@ -284,7 +295,180 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		_clFree(d_graph_mask);
 		_clFree(d_updating_graph_mask);
 		_clFree(d_graph_visited);
-		_clFree(d_cost);
+		_clFree(d_over);
+		_clRelease();
+		std::string e_str = "in run_transpose_gpu -> ";
+		e_str += msg;
+		throw(e_str);
+	}
+	return ;
+}
+
+//----------------------------------------------------------
+//--breadth first search on GPUs - vertex push
+//----------------------------------------------------------
+void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int * h_neighbours)
+								throw(std::string) {
+	int h_depth = -1;
+	char h_over;
+
+	int *h_level = (int *) malloc (no_of_nodes*sizeof(int)); //store the current minimum depth seen by a node
+	for (int i=0; i< no_of_nodes; i++) {
+		h_level[i] = INT_MAX;
+	}
+	h_level[0] = 0; //Setting source as zero -> Assumption that zeroth index is the source. 
+	//Change in case the source is read from the input
+
+	cl_mem d_graph_nodes, d_graph_edges, d_over, d_depth, d_level, d_neighbours;
+	try{
+		//--1 transfer data from host to device
+		_clInit();	
+		d_graph_nodes = _clMalloc(no_of_nodes*sizeof(Node), h_graph_nodes);
+		d_graph_edges = _clMalloc(edge_list_size*sizeof(Edge), h_graph_edges);
+		d_neighbours = _clMalloc(edge_list_size*sizeof(int), h_neighbours);
+		
+		d_over = _clMallocRW(sizeof(char), &h_over);
+		d_depth = _clMallocRW(sizeof(int), &h_depth);
+
+		d_level = _clMallocRW(no_of_nodes*sizeof(int), h_level);
+		
+		_clMemcpyH2D(d_graph_nodes, no_of_nodes*sizeof(Node), h_graph_nodes);
+		_clMemcpyH2D(d_graph_edges, edge_list_size*sizeof(Edge), h_graph_edges);	
+		_clMemcpyH2D(d_level, no_of_nodes*sizeof(int), h_level);
+		_clMemcpyH2D(d_neighbours, edge_list_size*sizeof(int), h_neighbours);
+			
+		//--2 invoke kernel
+#ifdef	PROFILING
+		timer kernel_timer;
+		double kernel_time = 0.0;		
+		kernel_timer.reset();
+		kernel_timer.start();
+#endif
+		do{
+			h_over = false;
+			h_depth = h_depth + 1;
+			
+			_clMemcpyH2D(d_over, sizeof(char), &h_over);
+			_clMemcpyH2D(d_depth, sizeof(int), &h_depth);
+			//--kernel 0
+			int kernel_id = 4;
+			int kernel_idx = 0;
+			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
+			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
+			_clSetArgs(kernel_id, kernel_idx++, &no_of_nodes, sizeof(int));
+			_clSetArgs(kernel_id, kernel_idx++, d_over);
+			_clSetArgs(kernel_id, kernel_idx++, d_depth);
+			_clSetArgs(kernel_id, kernel_idx++, d_level);
+			_clSetArgs(kernel_id, kernel_idx++, d_neighbours);
+			
+			//int work_items = no_of_nodes;
+			_clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
+			
+			_clMemcpyD2H(d_over,sizeof(char), &h_over);
+			}while(h_over);
+			
+		_clFinish();
+#ifdef	PROFILING
+		kernel_timer.stop();
+		kernel_time = kernel_timer.getTimeInSeconds();
+		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;		
+#endif
+		//--4 release cl resources.
+		_clFree(d_graph_nodes);
+		_clFree(d_graph_edges);
+		_clFree(d_over);
+		_clRelease();
+	}
+	catch(std::string msg){		
+		_clFree(d_graph_nodes);
+		_clFree(d_graph_edges);
+		_clFree(d_over);
+		_clRelease();
+		std::string e_str = "in run_transpose_gpu -> ";
+		e_str += msg;
+		throw(e_str);
+	}
+	return ;
+}
+
+//----------------------------------------------------------
+//--breadth first search on GPUs - vertex pull
+//----------------------------------------------------------
+void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int * h_reverse_neighbours)
+								throw(std::string) {
+	int h_depth = -1;
+	char h_over;
+
+	int *h_level = (int *) malloc (no_of_nodes*sizeof(int)); //store the current minimum depth seen by a node
+	for (int i=0; i< no_of_nodes; i++) {
+		h_level[i] = INT_MAX;
+	}
+	h_level[0] = 0; //Setting source as zero -> Assumption that zeroth index is the source. 
+	//Change in case the source is read from the input
+
+	cl_mem d_graph_nodes, d_graph_edges, d_over, d_depth, d_level, d_reverse_neighbours;
+	try{
+		//--1 transfer data from host to device
+		_clInit();	
+		d_graph_nodes = _clMalloc(no_of_nodes*sizeof(Node), h_graph_nodes);
+		d_graph_edges = _clMalloc(edge_list_size*sizeof(Edge), h_graph_edges);
+		d_reverse_neighbours = _clMalloc(edge_list_size*sizeof(int), h_reverse_neighbours);
+		
+		d_over = _clMallocRW(sizeof(char), &h_over);
+		d_depth = _clMallocRW(sizeof(int), &h_depth);
+
+		d_level = _clMallocRW(no_of_nodes*sizeof(int), h_level);
+		
+		_clMemcpyH2D(d_graph_nodes, no_of_nodes*sizeof(Node), h_graph_nodes);
+		_clMemcpyH2D(d_graph_edges, edge_list_size*sizeof(Edge), h_graph_edges);	
+		_clMemcpyH2D(d_level, no_of_nodes*sizeof(int), h_level);
+		_clMemcpyH2D(d_reverse_neighbours, edge_list_size*sizeof(int), h_reverse_neighbours);
+			
+		//--2 invoke kernel
+#ifdef	PROFILING
+		timer kernel_timer;
+		double kernel_time = 0.0;		
+		kernel_timer.reset();
+		kernel_timer.start();
+#endif
+		do{
+			h_over = false;
+			h_depth = h_depth + 1;
+			
+			_clMemcpyH2D(d_over, sizeof(char), &h_over);
+			_clMemcpyH2D(d_depth, sizeof(int), &h_depth);
+			//--kernel 0
+			int kernel_id = 5;
+			int kernel_idx = 0;
+			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
+			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
+			_clSetArgs(kernel_id, kernel_idx++, &no_of_nodes, sizeof(int));
+			_clSetArgs(kernel_id, kernel_idx++, d_over);
+			_clSetArgs(kernel_id, kernel_idx++, d_depth);
+			_clSetArgs(kernel_id, kernel_idx++, d_level);
+			_clSetArgs(kernel_id, kernel_idx++, d_reverse_neighbours);
+			
+			//int work_items = no_of_nodes;
+			_clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
+			
+			_clMemcpyD2H(d_over,sizeof(char), &h_over);
+			}while(h_over);
+			
+		_clFinish();
+#ifdef	PROFILING
+		kernel_timer.stop();
+		kernel_time = kernel_timer.getTimeInSeconds();
+		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;		
+#endif
+		//--4 release cl resources.
+		_clFree(d_graph_nodes);
+		_clFree(d_graph_edges);
+		_clFree(d_over);
+		_clRelease();
+	}
+	catch(std::string msg){		
+		_clFree(d_graph_nodes);
+		_clFree(d_graph_edges);
 		_clFree(d_over);
 		_clRelease();
 		std::string e_str = "in run_transpose_gpu -> ";
@@ -299,6 +483,38 @@ void Usage(int argc, char**argv){
 fprintf(stderr,"Usage: %s <input_file>\n", argv[0]);
 
 }
+
+long read_and_return_no_of_nodes(char *filename) {
+	long no_of_nodes = 0;
+	ifstream fin;
+	fin.open(filename);
+	std::string line;
+	int max = 0;
+	int min = INT_MAX;
+	// int min = 0;
+	
+	while (std::getline(fin, line)) {
+		int node_index = std::stol(line);
+		if (node_index > max) max = node_index;
+		if (node_index < min) min = node_index;
+	}
+
+	no_of_nodes = max - min + 1;
+
+	return no_of_nodes;
+}
+
+int read_and_return_no_of_edges(char *filename) 
+{
+	int no_of_edges = 0;
+	ifstream fin;
+	fin.open(filename);
+	std::string line;
+	
+	while (std::getline(fin, line)) no_of_edges++;
+
+	return no_of_edges; 
+}
 //----------------------------------------------------------
 //--cambine:	main function
 //--author:		created by Jianbin Fang
@@ -306,30 +522,28 @@ fprintf(stderr,"Usage: %s <input_file>\n", argv[0]);
 //----------------------------------------------------------
 int main(int argc, char * argv[])
 {
-	int no_of_nodes;
+	long no_of_nodes;
 	int edge_list_size;
 	FILE *fp;
 	Node* h_graph_nodes;
 	char *h_graph_mask, *h_updating_graph_mask, *h_graph_visited;
 	try{
-		char *input_f;
-		if(argc!=2){
-		  Usage(argc, argv);
-		  exit(0);
-		}
+		/* For now, read the input files directly instead of reading from i/o*/
+		char *input_fe = "/var/scratch/alvarban/BSc_2k19/graphs/SNAP/com-friendster.e";
+		char *input_fv = "/var/scratch/alvarban/BSc_2k19/graphs/SNAP/com-friendster.v";
 	
-		input_f = argv[1];
-		printf("Reading File\n");
+		no_of_nodes = read_and_return_no_of_nodes(input_fv);
+		printf("Number of nodes read are : %d\n", no_of_nodes);
+		edge_list_size = read_and_return_no_of_edges(input_fe);
+		printf("Number of edges read are : %d\n", edge_list_size);
+		
 		//Read in Graph from a file
-		fp = fopen(input_f,"r");
+		fp = fopen(input_fe,"r");
 		if(!fp){
-		  printf("Error Reading graph file\n");
+		  printf("Error Reading EdgeGraph file\n");
 		  return 0;
 		}
-
 		int source = 0;
-
-		fscanf(fp,"%d",&no_of_nodes);
 
 		int num_of_blocks = 1;
 		int num_of_threads_per_block = no_of_nodes;
@@ -343,75 +557,87 @@ int main(int argc, char * argv[])
 		work_group_size = num_of_threads_per_block;
 		// allocate host memory
 		h_graph_nodes = (Node*) malloc(sizeof(Node)*no_of_nodes);
+		for (int i=0; i < no_of_nodes; i++) {
+			h_graph_nodes[i].no_of_edges = 0;
+			h_graph_nodes[i].starting = -1;
+		}
 		h_graph_mask = (char*) malloc(sizeof(char)*no_of_nodes);
 		h_updating_graph_mask = (char*) malloc(sizeof(char)*no_of_nodes);
 		h_graph_visited = (char*) malloc(sizeof(char)*no_of_nodes);
 	
 		int start, edgeno;   
-		// initalize the memory
-		for(int i = 0; i < no_of_nodes; i++){
-			fscanf(fp,"%d %d",&start,&edgeno);
-			h_graph_nodes[i].starting = start;
-			h_graph_nodes[i].no_of_edges = edgeno;
-			h_graph_mask[i]=false;
-			h_updating_graph_mask[i]=false;
-			h_graph_visited[i]=false;
-		}
-		//read the source node from the file
-		fscanf(fp,"%d",&source);
-		source=0;
-		//set the source node as true in the mask
-		h_graph_mask[source]=true;
-		h_graph_visited[source]=true;
-    	fscanf(fp,"%d",&edge_list_size);
-   		int id,cost;
 		
 		struct Edge* h_graph_edges = (struct Edge*) malloc(sizeof(struct Edge)*edge_list_size);
-		int node_index = 0;
 		int neighbour_index = 0;
 		for(int i=0; i < edge_list_size ; i++){
-			if (neighbour_index >= h_graph_nodes[node_index].no_of_edges) {
-				node_index++;
-				neighbour_index = 0;
+			int in_index, out_index;
+			float cost; //for datagen
+			fscanf(fp, "%d", &in_index);
+			fscanf(fp, "%d", &out_index);
+			fscanf(fp, "%f", &cost); //only for datagen - delete for others
+			h_graph_edges[i].in_vertex = in_index;
+			h_graph_edges[i].out_vertex = out_index;
+			//Update the number of neighbours of the node with index in_index;
+			h_graph_nodes[in_index].no_of_edges++;
+		}
+
+		//compute neighbours array for vertex push
+		std::sort(h_graph_edges, h_graph_edges+edge_list_size, edge_compare);
+
+		int* neighbours = (int *)malloc(edge_list_size * sizeof(int));
+
+		int node_index = -1;
+		for (int i=0; i < edge_list_size; i++) {
+			if ((i==0) || (node_index != h_graph_edges[i].in_vertex)) {
+				node_index = h_graph_edges[i].in_vertex;
+				h_graph_nodes[node_index].starting = i;
 			}
-			fscanf(fp,"%d",&id);
-			fscanf(fp,"%d",&cost);
-			h_graph_edges[i].in_vertex = node_index;
-			h_graph_edges[i].out_vertex = id;
-			neighbour_index++;
+			neighbours[i] = h_graph_edges[i].out_vertex;
+		}
+
+		//compute reverse neighbours (parents) for vertex pull
+		std::sort(h_graph_edges, h_graph_edges+edge_list_size, edge_compare_reverse);
+
+		int* reverse_neighbours = (int *)malloc(edge_list_size * sizeof(int));
+
+		node_index = -1;
+		for (int i=0; i < edge_list_size; i++) {
+			if ((i==0) || (node_index != h_graph_edges[i].out_vertex)) {
+				node_index = h_graph_edges[i].out_vertex;
+				h_graph_nodes[node_index].starting = i;
+			}
+			reverse_neighbours[i] = h_graph_edges[i].in_vertex;
 		}
 
 		if(fp)
 			fclose(fp);    
-		// allocate mem for the result on host side
-		int	*h_cost = (int*) malloc(sizeof(int)*no_of_nodes);
-		int *h_cost_ref = (int*)malloc(sizeof(int)*no_of_nodes);
-		for(int i=0;i<no_of_nodes;i++){
-			h_cost[i]=-1;
-			h_cost_ref[i] = -1;
-		}
-		h_cost[source]=0;
-		h_cost_ref[source]=0;		
 		//---------------------------------------------------------
 		//--gpu entry
 		// run_bfs_gpu_rodinia(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost);	
-		run_bfs_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost);	
+		std::cout<<"Edgelist Implementation"<<std::endl;
+		run_bfs_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, false);	
+		std::cout<<"Reverse Edgelist Implementation"<<std::endl;
+		run_bfs_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, true);	
+		std::cout<<"Vertex Push Implementation"<<std::endl;
+		run_bfs_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours);
+		std::cout<<"Vertex Pull Implementation"<<std::endl;
+		run_bfs_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours);	
 		//---------------------------------------------------------
 		//--cpu entry
 		// initalize the memory again
-		for(int i = 0; i < no_of_nodes; i++){
-			h_graph_mask[i]=false;
-			h_updating_graph_mask[i]=false;
-			h_graph_visited[i]=false;
-		}
-		//set the source node as true in the mask
-		source=0;
-		h_graph_mask[source]=true;
-		h_graph_visited[source]=true;
-		run_bfs_cpu(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost_ref);
-		//---------------------------------------------------------
-		//--result varification
-		compare_results<int>(h_cost_ref, h_cost, no_of_nodes);
+		// for(int i = 0; i < no_of_nodes; i++){
+		// 	h_graph_mask[i]=false;
+		// 	h_updating_graph_mask[i]=false;
+		// 	h_graph_visited[i]=false;
+		// }
+		// //set the source node as true in the mask
+		// source=0;
+		// h_graph_mask[source]=true;
+		// h_graph_visited[source]=true;
+		// run_bfs_cpu(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost_ref);
+		// //---------------------------------------------------------
+		// //--result varification
+		// compare_results<int>(h_cost_ref, h_cost, no_of_nodes);
 		//release host memory		
 		free(h_graph_nodes);
 		free(h_graph_mask);
