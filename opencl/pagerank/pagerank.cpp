@@ -18,13 +18,15 @@
 #include "util.h"
 
 #define MAX_THREADS_PER_BLOCK 256
-#define NUM_ITERATIONS 50
+#define NUM_ITERATIONS 1
 
 //Structure to hold a node information
 struct Node
 {
 	int starting;
+	int reverse_starting;
 	int no_of_edges;
+	int no_of_reverse_edges;
 };
 
 struct Edge {
@@ -56,7 +58,7 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 	float *temp;
 	for (int i=0; i< no_of_nodes; i++) {
 		h_pagerank[i] = 0.25;
-		h_pagerank_new[i] = 0.25;
+		h_pagerank_new[i] = 0.0;
 	}
 	
 	cl_mem d_graph_nodes, d_graph_edges, \
@@ -90,7 +92,7 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 			_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
 			_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank);
 
-			int kernel_id = 2;
+			int kernel_id = 1;
 			int kernel_idx = 0;
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
@@ -161,7 +163,7 @@ void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge
 	float *temp;
 	for (int i=0; i< no_of_nodes; i++) {
 		h_pagerank[i] = 0.25;
-		h_pagerank_new[i] = 0.25;
+		h_pagerank_new[i] = 0.0;
 	}
 	
 	cl_mem d_graph_nodes, d_graph_edges, d_neighbours, \
@@ -201,7 +203,7 @@ void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge
 			_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank);
 
 
-			int kernel_id = 4;
+			int kernel_id = 2;
 			
 			int kernel_idx = 0;
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
@@ -268,31 +270,31 @@ void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge
 //----------------------------------------------------------
 //--pagerank - vertex pull
 //----------------------------------------------------------
-void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int *h_neighbours, double *time_taken)
+void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int *h_reverse_neighbours, double *time_taken)
 								throw(std::string) {
 	float *h_pagerank = (float *) malloc (no_of_nodes*sizeof(float));
 	float *h_pagerank_new = (float *) malloc (no_of_nodes*sizeof(float));
 	float *temp;
 	for (int i=0; i< no_of_nodes; i++) {
 		h_pagerank[i] = 0.25;
-		h_pagerank_new[i] = 0.25;
+		h_pagerank_new[i] = 0.0;
 	}
 	
-	cl_mem d_graph_nodes, d_graph_edges, d_neighbours, \
+	cl_mem d_graph_nodes, d_graph_edges, d_reverse_neighbours, \
 			 d_pagerank, d_pagerank_new;
 	try{
 		//--1 transfer data from host to device
 		_clInit();	
 		d_graph_nodes = _clMalloc(no_of_nodes*sizeof(Node), h_graph_nodes);
 		d_graph_edges = _clMalloc(edge_list_size*sizeof(Edge), h_graph_edges);
-		d_neighbours = _clMalloc(edge_list_size*sizeof(int), h_neighbours);
+		d_reverse_neighbours = _clMalloc(edge_list_size*sizeof(int), h_reverse_neighbours);
 		d_pagerank = _clMallocRW(no_of_nodes*sizeof(float), h_pagerank);
 		d_pagerank_new = _clMallocRW(no_of_nodes*sizeof(float), h_pagerank_new);
 		
 		
 		_clMemcpyH2D(d_graph_nodes, no_of_nodes*sizeof(Node), h_graph_nodes);
 		_clMemcpyH2D(d_graph_edges, edge_list_size*sizeof(Edge), h_graph_edges);	
-		_clMemcpyH2D(d_neighbours, edge_list_size*sizeof(int), h_neighbours);
+		_clMemcpyH2D(d_reverse_neighbours, edge_list_size*sizeof(int), h_reverse_neighbours);
 		_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
 		_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);
 		
@@ -308,17 +310,18 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 #endif
 		while(i < NUM_ITERATIONS){
 			
-			//h_pagerank has the newest values. copy these values into device pagerank and new pagerank arrays.
-			_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
-			_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank);
+			//Initialize the d_pagerank and d_pagerank_new arrays before invoking the kernel
+			//Not required for the first iteration
+			// if (i!=0) {
 
-			int kernel_id = 5;
+			// }
+			int kernel_id = 3;
 			
 			int kernel_idx = 0;
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
 			_clSetArgs(kernel_id, kernel_idx++, &no_of_nodes, sizeof(int));
-			_clSetArgs(kernel_id, kernel_idx++, d_neighbours);
+			_clSetArgs(kernel_id, kernel_idx++, d_reverse_neighbours);
 			_clSetArgs(kernel_id, kernel_idx++, d_pagerank);
 			_clSetArgs(kernel_id, kernel_idx++, d_pagerank_new);
 			
@@ -356,7 +359,7 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 		//--4 release cl resources.
 		_clFree(d_graph_nodes);
 		_clFree(d_graph_edges);
-		_clFree(d_neighbours);
+		_clFree(d_reverse_neighbours);
 		_clFree(d_pagerank);
 		_clFree(d_pagerank_new);
 		_clRelease();
@@ -364,7 +367,7 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 	catch(std::string msg){		
 		_clFree(d_graph_nodes);
 		_clFree(d_graph_edges);
-		_clFree(d_neighbours);
+		_clFree(d_reverse_neighbours);
 		_clFree(d_pagerank);
 		_clFree(d_pagerank_new);
 		_clRelease();
@@ -457,6 +460,8 @@ int main(int argc, char * argv[])
 		for (int i=0; i < no_of_nodes; i++) {
 			h_graph_nodes[i].no_of_edges = 0;
 			h_graph_nodes[i].starting = -1;
+			h_graph_nodes[i].reverse_starting = -1;
+			h_graph_nodes[i].no_of_reverse_edges = 0;
 		}
 		h_graph_mask = (char*) malloc(sizeof(char)*no_of_nodes);
 		h_updating_graph_mask = (char*) malloc(sizeof(char)*no_of_nodes);
@@ -471,11 +476,12 @@ int main(int argc, char * argv[])
 			float cost; //for datagen
 			fscanf(fp, "%d", &in_index);
 			fscanf(fp, "%d", &out_index);
-			fscanf(fp, "%f", &cost); //only for datagen - delete for others
+			// fscanf(fp, "%f", &cost); //only for datagen - delete for others
 			h_graph_edges[i].in_vertex = in_index;
 			h_graph_edges[i].out_vertex = out_index;
 			//Update the number of neighbours of the node with index in_index;
 			h_graph_nodes[in_index].no_of_edges++;
+			// std::cout<<h_graph_edges[i].in_vertex<<" "<<h_graph_edges[i].out_vertex<<", read values are : "<<in_index<<" "<<out_index<<endl;
 		}
 
 		//compute neighbours array for vertex push
@@ -485,6 +491,7 @@ int main(int argc, char * argv[])
 
 		int node_index = -1;
 		for (int i=0; i < edge_list_size; i++) {
+			// std::cout<<h_graph_edges[i].in_vertex<<", "<<h_graph_edges[i].out_vertex<<endl;
 			if ((i==0) || (node_index != h_graph_edges[i].in_vertex)) {
 				node_index = h_graph_edges[i].in_vertex;
 				h_graph_nodes[node_index].starting = i;
@@ -499,11 +506,15 @@ int main(int argc, char * argv[])
 
 		node_index = -1;
 		for (int i=0; i < edge_list_size; i++) {
+			// std::cout<<h_graph_edges[i].out_vertex<<", "<<h_graph_edges[i].in_vertex<<endl;
 			if ((i==0) || (node_index != h_graph_edges[i].out_vertex)) {
+				// if(i!=0) std::cout<<node_index<<": starting-"<<h_graph_nodes[node_index].starting<<", reverse-starting-"<<h_graph_nodes[node_index].reverse_starting<<", num reverses-"<<h_graph_nodes[node_index].no_of_reverse_edges<<endl;
 				node_index = h_graph_edges[i].out_vertex;
-				h_graph_nodes[node_index].starting = i;
+				h_graph_nodes[node_index].reverse_starting = i;
 			}
+			h_graph_nodes[node_index].no_of_reverse_edges++;
 			reverse_neighbours[i] = h_graph_edges[i].in_vertex;
+			if (node_index == 0) std::cout<<reverse_neighbours[i]<<endl;
 		}
 
 		if(fp)
@@ -512,9 +523,9 @@ int main(int argc, char * argv[])
 		//---------------------------------------------------------
 		//--gpu entry
 		// run_bfs_gpu_rodinia(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost);	
-		std::cout<<"Edgelist Implementation"<<std::endl;
+		// std::cout<<"Edgelist Implementation"<<std::endl;
 		// for (int i=0; i<1; i++)
-		run_pagerank_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, false, &time_taken);	
+		// run_pagerank_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, false, &time_taken);	
 		// std::cout<<"Reverse Edgelist Implementation"<<std::endl;
 		// for (int i=0; i<5; i++)
 		// run_bfs_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, true, &time_taken);	
@@ -523,7 +534,7 @@ int main(int argc, char * argv[])
 		run_pagerank_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
 		std::cout<<"Vertex Pull Implementation"<<std::endl;
 		// for (int i=0; i<5; i++)
-		run_pagerank_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
+		run_pagerank_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken);
 		
 		
 		//---------------------------------------------------------

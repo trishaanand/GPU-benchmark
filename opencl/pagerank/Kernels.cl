@@ -1,13 +1,10 @@
-/* ============================================================
-//--cambine: kernel funtion of Breadth-First-Search
-//--author:	created by Jianbin Fang
-//--date:	06/12/2010
-============================================================ */
 #pragma OPENCL EXTENSION cl_khr_byte_addressable_store: enable
 //Structure to hold a node information
 typedef struct{
 	int starting;
+	int reverse_starting;
 	int no_of_edges;
+	int no_of_reverse_edges;
 } Node;
 //Structure to hold edge information
 typedef struct{
@@ -56,43 +53,19 @@ void float_atomic_add(__global float *loc, const float f) {
 	}
 }
 
-//--7 parameters
-__kernel void BFS_1( const __global Node* g_graph_nodes,
-					const __global Edge* g_graph_edges, 
-					__global char* g_graph_mask, 
-					__global char* g_updating_graph_mask, 
-					__global char* g_graph_visited, 
-					__global int* g_cost, 
-					const  int no_of_nodes){
+__kernel void update_pagerank_arrays (__global float* g_pagerank,
+									  __global float* g_pagerank_new,
+									  const int no_of_nodes ) {
 	int tid = get_global_id(0);
-	if( tid<no_of_nodes && g_graph_mask[tid]){
-		g_graph_mask[tid]=false;
-		for(int i=g_graph_nodes[tid].starting; i<(g_graph_nodes[tid].no_of_edges + g_graph_nodes[tid].starting); i++){
-			int id = g_graph_edges[i].out_vertex;
-			if(!g_graph_visited[id]){
-				g_cost[id]=g_cost[tid]+1;
-				g_updating_graph_mask[id]=true;
-				}
-			}
-	}	
-}
 
-//--5 parameters
-__kernel void BFS_2(__global char* g_graph_mask, 
-					__global char* g_updating_graph_mask, 
-					__global char* g_graph_visited, 
-					__global char* g_over,
-					const  int no_of_nodes
-					) {
-	int tid = get_global_id(0);
-	if( tid<no_of_nodes && g_updating_graph_mask[tid]){
-
-		g_graph_mask[tid]=true;
-		g_graph_visited[tid]=true;
-		*g_over=true;
-		g_updating_graph_mask[tid]=false;
+	if (tid < no_of_nodes) {
+		//for the next iteration update the pagerank array with the new calculated values
+		g_pagerank[tid] = g_pagerank_new[tid];
+		//reset the new page rank array to 0 for the next iteration.
+		g_pagerank_new[tid] = 0.0;
 	}
 }
+
 //--10 parameters
 __kernel void edgelist( const __global Node* g_graph_nodes,
 					const __global Edge* g_graph_edges, 
@@ -115,31 +88,6 @@ __kernel void edgelist( const __global Node* g_graph_nodes,
 	}	
 }
 
-//--10 parameters
-__kernel void reverse_edgelist( const __global Node* g_graph_nodes,
-					const __global Edge* g_graph_edges, 
-					__global char* g_graph_mask, 
-					__global char* g_updating_graph_mask, 
-					__global char* g_graph_visited, 
-					const  int no_of_edges,
-					__global char* g_over,
-					__global int * g_depth,
-					__global int* g_level) {
-
-	int tid = get_global_id(0);
-
-	if( (tid<no_of_edges) && (g_level[g_graph_edges[tid].out_vertex]==*g_depth)){
-
-		int new_depth = *g_depth + 1;
-		
-		if (atomic_min(&g_level[g_graph_edges[tid].in_vertex], new_depth) > new_depth) {
-			 //atomic min returns the old value
-			//if the depth seen by a node is higher than the current new depth, we should try more depths
-			*g_over=true;
-		}
-	}	
-}
-
 //--6 parameters
 __kernel void vertex_push( const __global Node* g_graph_nodes,
 					const __global Edge* g_graph_edges, 
@@ -154,14 +102,17 @@ __kernel void vertex_push( const __global Node* g_graph_nodes,
 
 		float new_rank = 0.0f;
 		int degree = g_graph_nodes[tid].no_of_edges;
-		if (degree!=0) new_rank = g_pagerank[tid] / degree;
+		if (degree!=0) 
+			new_rank = g_pagerank[tid] / degree;
 
 		int starting = g_graph_nodes[tid].starting;
 		int max = starting + g_graph_nodes[tid].no_of_edges;
 		// printf("For node %d, starting is : %d and max is : %d\n", tid, starting, max);
 		for (int i=starting; i<max; i++ ) {
 			float_atomic_add(&g_pagerank_new[g_neighbours[i]], new_rank);
-			// printf("After atomic add : new updated value for out_vertex : %d is : %f\n", g_neighbours[i], g_pagerank_new[g_neighbours[i]]);
+			if(g_neighbours[i]==0) {
+				printf("%d : Added rank of vertex %d which was %f\n", g_neighbours[i], tid, new_rank);
+			}
 		}
 	}	
 }
@@ -170,7 +121,7 @@ __kernel void vertex_push( const __global Node* g_graph_nodes,
 __kernel void vertex_pull( const __global Node* g_graph_nodes,
 					const __global Edge* g_graph_edges, 
 					const  int no_of_nodes,
-					const __global int* g_neighbours,
+					const __global int* g_reverse_neighbours,
 					__global float* g_pagerank,
 					__global float* g_pagerank_new ) {
 
@@ -179,15 +130,22 @@ __kernel void vertex_pull( const __global Node* g_graph_nodes,
 	if (tid<no_of_nodes) {
 
 		//initialize to the last page rank seen by the vertex
-		float new_rank = g_pagerank[tid]; 
+		float new_rank = 0.0f; 
 	
-		int starting = g_graph_nodes[tid].starting;
-		int max = starting + g_graph_nodes[tid].no_of_edges;
+		int starting = g_graph_nodes[tid].reverse_starting;
+		int max = starting + g_graph_nodes[tid].no_of_reverse_edges;
 		
+		if (tid == 0) 
+			printf("For %d, starting is : %d and max is %d\n\n", tid, starting, max);
+
 		for (int i=starting; i<max; i++ ) {
-			int neighbour_index = g_neighbours[i];
+			int neighbour_index = g_reverse_neighbours[i];
+			float neighbour_rank = (g_pagerank[neighbour_index])/(g_graph_nodes[neighbour_index].no_of_edges);
 			int degree = g_graph_nodes[neighbour_index].no_of_edges;
-			if (degree != 0) new_rank += g_pagerank[neighbour_index]/degree;
+			if (degree != 0) new_rank += neighbour_rank;
+			if(tid==0) {
+				printf("%d : Added rank of vertex %d which was %f\n", tid, neighbour_index, neighbour_rank);
+			}
 		}
 		g_pagerank_new[tid] = new_rank;
 	}	
