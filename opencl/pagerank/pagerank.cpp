@@ -59,10 +59,9 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		h_pagerank_new[i] = 0.25;
 	}
 	
-	cl_mem d_graph_nodes, d_graph_edges, d_graph_mask, d_updating_graph_mask, \
-			d_graph_visited, d_pagerank, d_pagerank_new;
+	cl_mem d_graph_nodes, d_graph_edges, \
+			 d_pagerank, d_pagerank_new;
 	try{
-		// std::cout<<"Before transfer of data to the device."<<std::endl;
 		//--1 transfer data from host to device
 		_clInit();	
 		d_graph_nodes = _clMalloc(no_of_nodes*sizeof(Node), h_graph_nodes);
@@ -76,8 +75,6 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
 		_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);
 			
-		// std::cout<<"After transfer of data to the device."<<std::endl;
-
 		int i = 0;
 		int j=0;
 
@@ -88,18 +85,12 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		kernel_timer.reset();
 		kernel_timer.start();
 #endif
-		// std::cout<<"Before starting the iterations of pagerank"<<std::endl;
 		while(i < NUM_ITERATIONS){
-			// std::cout<<"Inside the iteration. Before copy of pagerank to the device."<<std::endl;
-			
+			//h_pagerank has the newest values. copy these values into device pagerank and new pagerank arrays.
 			_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
+			_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank);
 
-			int kernel_id;
-			if (reverse == true) {
-				kernel_id = 3;
-			} else {
-				kernel_id = 2;
-			}
+			int kernel_id = 2;
 			int kernel_idx = 0;
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
@@ -107,31 +98,19 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 			_clSetArgs(kernel_id, kernel_idx++, d_pagerank);
 			_clSetArgs(kernel_id, kernel_idx++, d_pagerank_new);
 			
-			// std::cout<<"Before invoking the kernel"<<std::endl;
-			//int work_items = no_of_nodes;
 			_clInvokeKernel(kernel_id, edge_list_size, work_group_size);
 			
-			// std::cout<<"After invoking the kernel, before copying new pagerank back"<<std::endl;
-			_clMemcpyD2H(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);	
-			// _clFinish();
-			// std::cout<<"After the copy of new page rank back to the host. Printing new pageranks now"<<std::endl;
-			// for (j=0; j<no_of_nodes;j++) {
-			// 	std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
-			// }
-			// std::cout<<std::endl<<"Now copying new pagerank into the old one"<<std::endl;
-			for (j=0; j<no_of_nodes; j++) {
-				h_pagerank[j] = h_pagerank_new[j];
-				// std::cout<<"Successful copy for iteration "<<j<<std::endl;
-			} 
+			_clMemcpyD2H(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);	 
 			i++;
-			// temp = h_pagerank;
-			// h_pagerank = h_pagerank_new;
-			// h_pagerank_new = temp;
-			// std::cout<<"End of iteration. new page rank has been copied into the old pagerank. "<<std::endl;
-			}
+
+			temp = h_pagerank;
+			h_pagerank = h_pagerank_new;
+			h_pagerank_new = temp;
+		
+		}
 			
 		_clFinish();
-		// std::cout<<"Num iterations : "<<h_depth<<std::endl;
+		
 #ifdef	PROFILING
 		kernel_timer.stop();
 		kernel_time = kernel_timer.getTimeInSeconds();
@@ -140,7 +119,7 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		//--3 transfer data from device to host
 		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
 		std::cout<<"New page ranks are "<<std::endl;
-		for (j=0; j<no_of_nodes;j++) {
+		for (j=0; j<10;j++) {
 			std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
 		}
 		std::cout<<std::endl;
@@ -173,38 +152,39 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 }
 
 //----------------------------------------------------------
-//--breadth first search on GPUs - vertex push
+//--pagerank - vertex push
 //----------------------------------------------------------
-void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int * h_neighbours, double *time_taken)
+void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int *h_neighbours, double *time_taken)
 								throw(std::string) {
-	int h_depth = -1;
-	char h_over;
-
-	int *h_level = (int *) malloc (no_of_nodes*sizeof(int)); //store the current minimum depth seen by a node
+	float *h_pagerank = (float *) malloc (no_of_nodes*sizeof(float));
+	float *h_pagerank_new = (float *) malloc (no_of_nodes*sizeof(float));
+	float *temp;
 	for (int i=0; i< no_of_nodes; i++) {
-		h_level[i] = INT_MAX;
+		h_pagerank[i] = 0.25;
+		h_pagerank_new[i] = 0.25;
 	}
-	h_level[0] = 0; //Setting source as zero -> Assumption that zeroth index is the source. 
-	//Change in case the source is read from the input
-
-	cl_mem d_graph_nodes, d_graph_edges, d_over, d_depth, d_level, d_neighbours;
+	
+	cl_mem d_graph_nodes, d_graph_edges, d_neighbours, \
+			 d_pagerank, d_pagerank_new;
 	try{
 		//--1 transfer data from host to device
 		_clInit();	
 		d_graph_nodes = _clMalloc(no_of_nodes*sizeof(Node), h_graph_nodes);
 		d_graph_edges = _clMalloc(edge_list_size*sizeof(Edge), h_graph_edges);
 		d_neighbours = _clMalloc(edge_list_size*sizeof(int), h_neighbours);
+		d_pagerank = _clMallocRW(no_of_nodes*sizeof(float), h_pagerank);
+		d_pagerank_new = _clMallocRW(no_of_nodes*sizeof(float), h_pagerank_new);
 		
-		d_over = _clMallocRW(sizeof(char), &h_over);
-		d_depth = _clMallocRW(sizeof(int), &h_depth);
-
-		d_level = _clMallocRW(no_of_nodes*sizeof(int), h_level);
 		
 		_clMemcpyH2D(d_graph_nodes, no_of_nodes*sizeof(Node), h_graph_nodes);
 		_clMemcpyH2D(d_graph_edges, edge_list_size*sizeof(Edge), h_graph_edges);	
-		_clMemcpyH2D(d_level, no_of_nodes*sizeof(int), h_level);
 		_clMemcpyH2D(d_neighbours, edge_list_size*sizeof(int), h_neighbours);
-			
+		_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
+		_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);
+		
+		int i = 0;
+		int j=0;
+
 		//--2 invoke kernel
 #ifdef	PROFILING
 		timer kernel_timer;
@@ -212,47 +192,71 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		kernel_timer.reset();
 		kernel_timer.start();
 #endif
-		do{
-			h_over = false;
-			h_depth = h_depth + 1;
+		while(i < NUM_ITERATIONS){
+		// while (i < 2) {
+			// std::cout<<"Starting iteration "<<i<<endl;
 			
-			_clMemcpyH2D(d_over, sizeof(char), &h_over);
-			_clMemcpyH2D(d_depth, sizeof(int), &h_depth);
-			//--kernel 0
+			//h_pagerank has the newest values. copy these values into device pagerank and new pagerank arrays.
+			_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
+			_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank);
+
+
 			int kernel_id = 4;
+			
 			int kernel_idx = 0;
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
 			_clSetArgs(kernel_id, kernel_idx++, &no_of_nodes, sizeof(int));
-			_clSetArgs(kernel_id, kernel_idx++, d_over);
-			_clSetArgs(kernel_id, kernel_idx++, d_depth);
-			_clSetArgs(kernel_id, kernel_idx++, d_level);
 			_clSetArgs(kernel_id, kernel_idx++, d_neighbours);
+			_clSetArgs(kernel_id, kernel_idx++, d_pagerank);
+			_clSetArgs(kernel_id, kernel_idx++, d_pagerank_new);
 			
-			//int work_items = no_of_nodes;
-			_clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
+			_clInvokeKernel(kernel_id, edge_list_size, work_group_size);
 			
-			_clMemcpyD2H(d_over,sizeof(char), &h_over);
-			}while(h_over);
+			_clMemcpyD2H(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);	 
+			i++;
 			
+			temp = h_pagerank;
+			h_pagerank = h_pagerank_new;
+			h_pagerank_new = temp;
+			// std::cout<<"Iteration "<<i<<" completed"<<endl;
+		}
+
 		_clFinish();
-		std::cout<<"Num iterations : "<<h_depth<<std::endl;
+		
 #ifdef	PROFILING
 		kernel_timer.stop();
 		kernel_time = kernel_timer.getTimeInSeconds();
 		*time_taken = kernel_time;
-		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;		
+			
 #endif
+		//--3 transfer data from device to host
+		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
+		std::cout<<"New page ranks are "<<std::endl;
+		for (j=0; j<10;j++) {
+		    // if (h_pagerank_new[j] != 0.25)
+			    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
+		}
+		std::cout<<std::endl;
+
+#ifdef  PROFILING
+		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;	
+#endif
+
 		//--4 release cl resources.
 		_clFree(d_graph_nodes);
 		_clFree(d_graph_edges);
-		_clFree(d_over);
+		_clFree(d_neighbours);
+		_clFree(d_pagerank);
+		_clFree(d_pagerank_new);
 		_clRelease();
 	}
 	catch(std::string msg){		
 		_clFree(d_graph_nodes);
 		_clFree(d_graph_edges);
-		_clFree(d_over);
+		_clFree(d_neighbours);
+		_clFree(d_pagerank);
+		_clFree(d_pagerank_new);
 		_clRelease();
 		std::string e_str = "in run_transpose_gpu -> ";
 		e_str += msg;
@@ -262,43 +266,39 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 }
 
 //----------------------------------------------------------
-//--breadth first search on GPUs - vertex pull
+//--pagerank - vertex pull
 //----------------------------------------------------------
-void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int * h_reverse_neighbours, double *time_taken)
+void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int *h_neighbours, double *time_taken)
 								throw(std::string) {
-	int h_depth = -1;
-	char h_over;
-
-	int *h_level = (int *) malloc (no_of_nodes*sizeof(int)); //store the current minimum depth seen by a node
+	float *h_pagerank = (float *) malloc (no_of_nodes*sizeof(float));
+	float *h_pagerank_new = (float *) malloc (no_of_nodes*sizeof(float));
+	float *temp;
 	for (int i=0; i< no_of_nodes; i++) {
-		h_level[i] = INT_MAX;
+		h_pagerank[i] = 0.25;
+		h_pagerank_new[i] = 0.25;
 	}
-	h_level[0] = 0; //Setting source as zero -> Assumption that zeroth index is the source. 
-	//Change in case the source is read from the input
-
-	/* Test code to delete */
-	for (int i=0; i<edge_list_size; i++) {
-		
-	}
-
-	cl_mem d_graph_nodes, d_graph_edges, d_over, d_depth, d_level, d_reverse_neighbours;
+	
+	cl_mem d_graph_nodes, d_graph_edges, d_neighbours, \
+			 d_pagerank, d_pagerank_new;
 	try{
 		//--1 transfer data from host to device
 		_clInit();	
 		d_graph_nodes = _clMalloc(no_of_nodes*sizeof(Node), h_graph_nodes);
 		d_graph_edges = _clMalloc(edge_list_size*sizeof(Edge), h_graph_edges);
-		d_reverse_neighbours = _clMalloc(edge_list_size*sizeof(int), h_reverse_neighbours);
+		d_neighbours = _clMalloc(edge_list_size*sizeof(int), h_neighbours);
+		d_pagerank = _clMallocRW(no_of_nodes*sizeof(float), h_pagerank);
+		d_pagerank_new = _clMallocRW(no_of_nodes*sizeof(float), h_pagerank_new);
 		
-		d_over = _clMallocRW(sizeof(char), &h_over);
-		d_depth = _clMallocRW(sizeof(int), &h_depth);
-
-		d_level = _clMallocRW(no_of_nodes*sizeof(int), h_level);
 		
 		_clMemcpyH2D(d_graph_nodes, no_of_nodes*sizeof(Node), h_graph_nodes);
 		_clMemcpyH2D(d_graph_edges, edge_list_size*sizeof(Edge), h_graph_edges);	
-		_clMemcpyH2D(d_level, no_of_nodes*sizeof(int), h_level);
-		_clMemcpyH2D(d_reverse_neighbours, edge_list_size*sizeof(int), h_reverse_neighbours);
-			
+		_clMemcpyH2D(d_neighbours, edge_list_size*sizeof(int), h_neighbours);
+		_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
+		_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);
+		
+		int i = 0;
+		int j=0;
+
 		//--2 invoke kernel
 #ifdef	PROFILING
 		timer kernel_timer;
@@ -306,47 +306,67 @@ void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		kernel_timer.reset();
 		kernel_timer.start();
 #endif
-		do{
-			h_over = false;
-			h_depth = h_depth + 1;
+		while(i < NUM_ITERATIONS){
 			
-			_clMemcpyH2D(d_over, sizeof(char), &h_over);
-			_clMemcpyH2D(d_depth, sizeof(int), &h_depth);
-			//--kernel 0
+			//h_pagerank has the newest values. copy these values into device pagerank and new pagerank arrays.
+			_clMemcpyH2D(d_pagerank, no_of_nodes*sizeof(float), h_pagerank);
+			_clMemcpyH2D(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank);
+
 			int kernel_id = 5;
+			
 			int kernel_idx = 0;
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
 			_clSetArgs(kernel_id, kernel_idx++, &no_of_nodes, sizeof(int));
-			_clSetArgs(kernel_id, kernel_idx++, d_over);
-			_clSetArgs(kernel_id, kernel_idx++, d_depth);
-			_clSetArgs(kernel_id, kernel_idx++, d_level);
-			_clSetArgs(kernel_id, kernel_idx++, d_reverse_neighbours);
+			_clSetArgs(kernel_id, kernel_idx++, d_neighbours);
+			_clSetArgs(kernel_id, kernel_idx++, d_pagerank);
+			_clSetArgs(kernel_id, kernel_idx++, d_pagerank_new);
 			
-			//int work_items = no_of_nodes;
-			_clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
+			_clInvokeKernel(kernel_id, edge_list_size, work_group_size);
 			
-			_clMemcpyD2H(d_over,sizeof(char), &h_over);
-			}while(h_over);
+			_clMemcpyD2H(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);	 
+			i++;
 			
+			temp = h_pagerank;
+			h_pagerank = h_pagerank_new;
+			h_pagerank_new = temp;
+			// std::cout<<"Iteration "<<i<<" completed"<<endl;
+		}
+
 		_clFinish();
-		std::cout<<"Num iterations : "<<h_depth<<std::endl;
+		
 #ifdef	PROFILING
 		kernel_timer.stop();
 		kernel_time = kernel_timer.getTimeInSeconds();
 		*time_taken = kernel_time;
-		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;		
+			
 #endif
+		//--3 transfer data from device to host
+		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
+		std::cout<<"New page ranks are "<<std::endl;
+		for (j=0; j<10;j++) {
+			    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
+		}
+		std::cout<<std::endl;
+
+#ifdef  PROFILING
+		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;	
+#endif
+
 		//--4 release cl resources.
 		_clFree(d_graph_nodes);
 		_clFree(d_graph_edges);
-		_clFree(d_over);
+		_clFree(d_neighbours);
+		_clFree(d_pagerank);
+		_clFree(d_pagerank_new);
 		_clRelease();
 	}
 	catch(std::string msg){		
 		_clFree(d_graph_nodes);
 		_clFree(d_graph_edges);
-		_clFree(d_over);
+		_clFree(d_neighbours);
+		_clFree(d_pagerank);
+		_clFree(d_pagerank_new);
 		_clRelease();
 		std::string e_str = "in run_transpose_gpu -> ";
 		e_str += msg;
@@ -493,17 +513,17 @@ int main(int argc, char * argv[])
 		//--gpu entry
 		// run_bfs_gpu_rodinia(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, h_cost);	
 		std::cout<<"Edgelist Implementation"<<std::endl;
-		for (int i=0; i<1; i++)
+		// for (int i=0; i<1; i++)
 		run_pagerank_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, false, &time_taken);	
 		// std::cout<<"Reverse Edgelist Implementation"<<std::endl;
 		// for (int i=0; i<5; i++)
 		// run_bfs_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, true, &time_taken);	
-		// std::cout<<"Vertex Push Implementation"<<std::endl;
+		 std::cout<<"Vertex Push Implementation"<<std::endl;
 		// for (int i=0; i<5; i++)
-		// run_bfs_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
-		// std::cout<<"Vertex Pull Implementation"<<std::endl;
+		run_pagerank_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
+		std::cout<<"Vertex Pull Implementation"<<std::endl;
 		// for (int i=0; i<5; i++)
-		// run_bfs_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken);	
+		run_pagerank_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
 		
 		
 		//---------------------------------------------------------

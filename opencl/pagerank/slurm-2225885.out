@@ -1,0 +1,14 @@
+Number of nodes read are : 1024
+Number of edges read are : 10551
+Edgelist Implementation
+New page ranks are 
+0 : 2.92583e+13, 1 : 1.14274e+14, 2 : 4.35142e+13, 3 : 1.60825e+13, 4 : 2.93519e+13, 5 : 0.25, 6 : 2.07102e+14, 7 : 2.32228e+14, 8 : 1.08861e+14, 9 : 9.69456e+13, 
+kernel time(s):0.217092
+Vertex Push Implementation
+New page ranks are 
+0 : 4.96738e+14, 1 : 3.0486e+13, 2 : 1.3383e+13, 3 : 9.47522e+12, 4 : 0.25, 5 : 0.25, 6 : 7.56164e+13, 7 : 5.3511e+14, 8 : 4.16391e+13, 9 : 1.04428e+13, 
+kernel time(s):0.317614
+Vertex Pull Implementation
+New page ranks are 
+0 : 1.41547e+14, 1 : 3.39816e+14, 2 : 6.84065e+13, 3 : 7.04205e+13, 4 : 3.47999e+14, 5 : 0.25, 6 : 1.24809e+15, 7 : 1.19855e+15, 8 : 3.50657e+14, 9 : 6.24537e+14, 
+kernel time(s):0.216016
