@@ -110,9 +110,9 @@ __kernel void vertex_push( const __global Node* g_graph_nodes,
 		// printf("For node %d, starting is : %d and max is : %d\n", tid, starting, max);
 		for (int i=starting; i<max; i++ ) {
 			float_atomic_add(&g_pagerank_new[g_neighbours[i]], new_rank);
-			if(g_neighbours[i]==0) {
-				printf("%d : Added rank of vertex %d which was %f\n", g_neighbours[i], tid, new_rank);
-			}
+			// if(g_neighbours[i]==0) {
+			// 	printf("%d : Added rank of vertex %d which was %f\n", g_neighbours[i], tid, new_rank);
+			// }
 		}
 	}	
 }
@@ -135,17 +135,17 @@ __kernel void vertex_pull( const __global Node* g_graph_nodes,
 		int starting = g_graph_nodes[tid].reverse_starting;
 		int max = starting + g_graph_nodes[tid].no_of_reverse_edges;
 		
-		if (tid == 0) 
-			printf("For %d, starting is : %d and max is %d\n\n", tid, starting, max);
+		// if (tid == 0) 
+		// 	printf("For %d, starting is : %d and max is %d\n\n", tid, starting, max);
 
 		for (int i=starting; i<max; i++ ) {
 			int neighbour_index = g_reverse_neighbours[i];
 			float neighbour_rank = (g_pagerank[neighbour_index])/(g_graph_nodes[neighbour_index].no_of_edges);
 			int degree = g_graph_nodes[neighbour_index].no_of_edges;
 			if (degree != 0) new_rank += neighbour_rank;
-			if(tid==0) {
-				printf("%d : Added rank of vertex %d which was %f\n", tid, neighbour_index, neighbour_rank);
-			}
+			// if(tid==0) {
+			// 	printf("%d : Added rank of vertex %d which was %f\n", tid, neighbour_index, neighbour_rank);
+			// }
 		}
 		g_pagerank_new[tid] = new_rank;
 	}	
