@@ -62,7 +62,7 @@ __kernel void update_pagerank_arrays (__global float* g_pagerank,
 		//for the next iteration update the pagerank array with the new calculated values
 		g_pagerank[tid] = g_pagerank_new[tid];
 		//reset the new page rank array to 0 for the next iteration.
-		g_pagerank_new[tid] = 0.0;
+		// g_pagerank_new[tid] = 0.0;
 	}
 }
 

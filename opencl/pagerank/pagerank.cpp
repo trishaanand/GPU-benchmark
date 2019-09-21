@@ -87,6 +87,7 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		kernel_timer.reset();
 		kernel_timer.start();
 #endif
+		i = 0;
 		while(i < NUM_ITERATIONS){
 			int kernel_id;
 			int kernel_idx;
@@ -100,7 +101,8 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 				_clSetArgs(kernel_id, kernel_idx++, d_pagerank_new);
 				_clSetArgs(kernel_id, kernel_idx++, &no_of_nodes, sizeof(int));
 
-				_clInvokeKernel(kernel_id, edge_list_size, work_group_size);
+				_clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
+				_clFinish();
 			}
 			
 			kernel_id = 1;
@@ -113,13 +115,7 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 			
 			_clInvokeKernel(kernel_id, edge_list_size, work_group_size);
 			
-			// _clMemcpyD2H(d_pagerank_new, no_of_nodes*sizeof(float), h_pagerank_new);	 
 			i++;
-
-			// temp = h_pagerank;
-			// h_pagerank = h_pagerank_new;
-			// h_pagerank_new = temp;
-		
 		}
 			
 		_clFinish();
@@ -131,11 +127,12 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 #endif
 		//--3 transfer data from device to host
 		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
-		// std::cout<<"New page ranks are "<<std::endl;
-		// for (j=0; j<10;j++) {
-		// 	std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
-		// }
-		// std::cout<<std::endl;
+		std::cout<<"New page ranks are "<<std::endl;
+		// if (h_pagerank_new[j] != 0) {
+		for (j=0; j<9; j++) {
+			std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
+		}
+		std::cout<<std::endl;
 		//--statistics
 #ifdef	PROFILING
 		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;		
@@ -251,12 +248,13 @@ void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge
 #endif
 		//--3 transfer data from device to host
 		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
-		// std::cout<<"New page ranks are "<<std::endl;
-		// for (j=0; j<10;j++) {
-		//     // if (h_pagerank_new[j] != 0.25)
-		// 	    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
-		// }
-		// std::cout<<std::endl;
+		std::cout<<"New page ranks are "<<std::endl;
+		// if (h_pagerank_new[j] != 0) {
+		for (j=0; j<9; j++) {
+		    // if (h_pagerank_new[j] != 0.25)
+			    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
+		}
+		std::cout<<std::endl;
 
 #ifdef  PROFILING
 		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;	
@@ -371,11 +369,12 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 #endif
 		//--3 transfer data from device to host
 		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
-		// std::cout<<"New page ranks are "<<std::endl;
-		// for (j=0; j<10;j++) {
-		// 	    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
-		// }
-		// std::cout<<std::endl;
+		std::cout<<"New page ranks are "<<std::endl;
+		// if (h_pagerank_new[j] != 0) {
+		for (j=0; j<9; j++) {
+			    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
+		}
+		std::cout<<std::endl;
 
 #ifdef  PROFILING
 		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;	
@@ -548,15 +547,15 @@ int main(int argc, char * argv[])
 		//---------------------------------------------------------
 		//--gpu entry
 		std::cout<<endl<<"Edgelist Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		// for (int i=0; i<5; i++)
 			run_pagerank_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, false, &time_taken);	
 		
 		std::cout<<endl<<"Vertex Push Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		// for (int i=0; i<5; i++)
 			run_pagerank_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
 		
 		std::cout<<endl<<"Vertex Pull Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		// for (int i=0; i<5; i++)
 			run_pagerank_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken);
 		
 		//release host memory		
