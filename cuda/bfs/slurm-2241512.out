@@ -1,0 +1,15 @@
+Number of nodes read are : 1024
+Number of edges read are : 10552
+Edgelist Implementation
+Kernel time : 240000.000000 ns
+Kernel time : 176000.000000 ns
+Kernel time : 174000.000000 ns
+Kernel time : 174000.000000 ns
+Kernel time : 170000.000000 ns
+
+Reverse Edgelist Implementation
+Kernel time : 216000.000000 ns
+Kernel time : 208000.000000 ns
+Kernel time : 206000.000000 ns
+Kernel time : 207000.000000 ns
+Kernel time : 230000.000000 ns

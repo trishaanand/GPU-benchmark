@@ -38,7 +38,7 @@ EXECUTABLE	:= bfs
 # CUDA source files (compiled with cudacc)
 CUFILES		:= bfs.cu
 # CUDA dependency files
-CU_DEPS		:= kernel2.cu kernel.cu
+CU_DEPS		:= kernels.cu
 
 
 ################################################################################
