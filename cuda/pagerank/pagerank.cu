@@ -129,17 +129,17 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
 		printf("Kernel time : %f ns\n", elapsedTime);
 		
-		cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
-		if (cudaSuccess != err) {
-			fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
-			exit(-1);
-		}
-		printf("New pageranks are : \n");
-		int max = 0;
-		for (int i=0; i<no_of_nodes; i++) {
-			printf("%d : %f, ", i, h_pagerank_new[i]);
-		}
-		printf("\n");
+		// cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
+		// if (cudaSuccess != err) {
+		// 	fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
+		// 	exit(-1);
+		// }
+		// printf("New pageranks are : \n");
+		// int max = 0;
+		// for (int i=0; i<no_of_nodes; i++) {
+		// 	printf("%d : %f, ", i, h_pagerank_new[i]);
+		// }
+		// printf("\n");
 		
 		//--4 release cuda resources.
 		cudaFree(d_graph_nodes);
@@ -261,17 +261,17 @@ void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge
 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
 		printf("Kernel time : %f ns\n", elapsedTime);
 		
-		cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
-		if (cudaSuccess != err) {
-			fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
-			exit(-1);
-		}
-		printf("New pageranks are : \n");
-		int max = 0;
-		for (int i=0; i<no_of_nodes; i++) {
-			printf("%d : %f, ", i, h_pagerank_new[i]);
-		}
-		printf("\n");
+		// cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
+		// if (cudaSuccess != err) {
+		// 	fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
+		// 	exit(-1);
+		// }
+		// printf("New pageranks are : \n");
+		// int max = 0;
+		// for (int i=0; i<no_of_nodes; i++) {
+		// 	printf("%d : %f, ", i, h_pagerank_new[i]);
+		// }
+		// printf("\n");
 		
 		//--4 release cuda resources.
 		cudaFree(d_graph_nodes);
@@ -323,9 +323,9 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 	cudaMalloc( (void**) &d_graph_edges, sizeof(Edge)*edge_list_size) ;
 	cudaMemcpy( d_graph_edges, h_graph_edges, sizeof(Edge)*edge_list_size, cudaMemcpyHostToDevice) ;
 
-	int *d_neighbours;
-	cudaMalloc( (void**) &d_neighbours, sizeof(int)*edge_list_size) ;
-	cudaMemcpy( d_neighbours, h_neighbours, sizeof(int)*edge_list_size, cudaMemcpyHostToDevice) ;
+	int *d_reverse_neighbours;
+	cudaMalloc( (void**) &d_reverse_neighbours, sizeof(int)*edge_list_size) ;
+	cudaMemcpy( d_reverse_neighbours, h_reverse_neighbours, sizeof(int)*edge_list_size, cudaMemcpyHostToDevice) ;
 
 	int *d_no_of_edges;
 	cudaMalloc( (void**) &d_no_of_edges, sizeof(int)) ;
@@ -369,10 +369,10 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 			
 			cudaDeviceSynchronize();
 
-			vertex_push<<< grid, threads, 0 >>>( 	d_graph_nodes,
+			vertex_pull<<< grid, threads, 0 >>>( 	d_graph_nodes,
 												d_graph_edges, 
 												d_no_of_edges,
-												d_neighbours,
+												d_reverse_neighbours,
 												d_pagerank,
 												d_pagerank_new);
 			err = cudaGetLastError();
@@ -393,17 +393,17 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
 		printf("Kernel time : %f ns\n", elapsedTime);
 		
-		cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
-		if (cudaSuccess != err) {
-			fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
-			exit(-1);
-		}
-		printf("New pageranks are : \n");
-		int max = 0;
-		for (int i=0; i<no_of_nodes; i++) {
-			printf("%d : %f, ", i, h_pagerank_new[i]);
-		}
-		printf("\n");
+		// cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
+		// if (cudaSuccess != err) {
+		// 	fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
+		// 	exit(-1);
+		// }
+		// printf("New pageranks are : \n");
+		// int max = 0;
+		// for (int i=0; i<no_of_nodes; i++) {
+		// 	printf("%d : %f, ", i, h_pagerank_new[i]);
+		// }
+		// printf("\n");
 		
 		//--4 release cuda resources.
 		cudaFree(d_graph_nodes);
@@ -474,11 +474,11 @@ int main(int argc, char * argv[])
 	char *h_graph_mask, *h_updating_graph_mask, *h_graph_visited;
 	try{
 		/* For now, read the input files directly instead of reading from i/o*/
-		// char *input_fe = "/var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.e";
-		// char *input_fv = "/var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.v";
+		char *input_fe = "/var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.e";
+		char *input_fv = "/var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.v";
 
-		char *input_fe = "trisha-file.e";
-		char *input_fv = "trisha-file.v";
+		// char *input_fe = "trisha-file.e";
+		// char *input_fv = "trisha-file.v";
 	
 		// char *input_fe = "/home/tanand/rodinia_3.1/graph500-10-superconnected.e";
 		
@@ -598,7 +598,7 @@ int main(int argc, char * argv[])
 		// printf("runing with dim3 num_of_blocks %d, num_of_threads_per_block %d\n", num_of_blocks, num_of_threads_per_block);
 		
 		std::cout<<"\nEdgelist Implementation"<<std::endl;
-		// for (int i=0; i<5; i++)
+		for (int i=0; i<5; i++)
 			run_pagerank_gpu_edgelist(no_of_nodes, h_graph_nodes,edge_list_size,h_graph_edges, &time_taken);	
 			
 		
@@ -613,11 +613,11 @@ int main(int argc, char * argv[])
 		}
 
 		std::cout<<std::endl<<"Vertex Push Implementation"<<std::endl;
-		// for (int i=0; i<5; i++)
+		for (int i=0; i<5; i++)
 			run_pagerank_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
-		// std::cout<<std::endl<<"Vertex Pull Implementation"<<std::endl;
-		// for (int i=0; i<5; i++)	
-		// 	run_pagerank_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
+		std::cout<<std::endl<<"Vertex Pull Implementation"<<std::endl;
+		for (int i=0; i<5; i++)	
+			run_pagerank_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
 		
 		//release host memory		
 		free(h_graph_nodes);
