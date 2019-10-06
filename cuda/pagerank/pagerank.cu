@@ -38,7 +38,6 @@ int edge_compare_reverse(const void *lhs, const void *rhs) {
 void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_size, Edge *h_graph_edges, double* time_taken)
 					throw(std::string) {
 
-	printf("In the edgelist function\n");
 	float *h_pagerank = (float *) malloc (no_of_nodes*sizeof(float));
 	float *h_pagerank_new = (float *) malloc (no_of_nodes*sizeof(float));
 	for (int i=0; i< no_of_nodes; i++) {
@@ -46,7 +45,6 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		h_pagerank_new[i] = 0.0;
 	}
 	
-	printf("Before calling any cuda functions\n");
 	//--1 transfer data from host to device
 
 	float *d_pagerank;
@@ -131,16 +129,17 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
 		printf("Kernel time : %f ns\n", elapsedTime);
 		
-		// cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
-		// if (cudaSuccess != err) {
-		// 	fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
-		// 	exit(-1);
-		// }
-		// printf("New pageranks are : \n");
-		// int max = 0;
-		// for (int i=0; i<no_of_nodes; i++) {
-		// 	printf("%d : %f, ", i, h_pagerank_new[i]);
-		// }
+		cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
+		if (cudaSuccess != err) {
+			fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
+			exit(-1);
+		}
+		printf("New pageranks are : \n");
+		int max = 0;
+		for (int i=0; i<no_of_nodes; i++) {
+			printf("%d : %f, ", i, h_pagerank_new[i]);
+		}
+		printf("\n");
 		
 		//--4 release cuda resources.
 		cudaFree(d_graph_nodes);
@@ -164,279 +163,269 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 	return ;
 }
 
-// void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int * h_neighbours, double *time_taken, char *h_graph_visited)
-// 								throw(std::string) {
+void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int * h_neighbours, double *time_taken)
+								throw(std::string) {
 
-// 	//int number_elements = height*width;
-// 	int h_depth = -1;
-// 	char h_over;
+	float *h_pagerank = (float *) malloc (no_of_nodes*sizeof(float));
+	float *h_pagerank_new = (float *) malloc (no_of_nodes*sizeof(float));
+	for (int i=0; i< no_of_nodes; i++) {
+		h_pagerank[i] = 0.25;
+		h_pagerank_new[i] = 0.0;
+	}
 	
-// 	int *h_level = (int *) malloc (no_of_nodes*sizeof(int)); //store the current minimum depth seen by a node
-// 	for (int i=0; i< no_of_nodes; i++) {
-// 		h_level[i] = INT_MAX;	
-// 		h_graph_visited[i] = false;
-// 	}
-// 	h_level[0] = 0;
-	
-// 	//--1 transfer data from host to device
-	
-// 	Node *d_graph_nodes;
-// 	cudaMalloc( (void**) &d_graph_nodes, sizeof(Node)*no_of_nodes) ;
-// 	cudaMemcpy( d_graph_nodes, h_graph_nodes, sizeof(Node)*no_of_nodes, cudaMemcpyHostToDevice) ;
-	
-// 	Edge *d_graph_edges;
-// 	cudaMalloc( (void**) &d_graph_edges, sizeof(Edge)*edge_list_size) ;
-// 	cudaMemcpy( d_graph_edges, h_graph_edges, sizeof(Edge)*edge_list_size, cudaMemcpyHostToDevice) ;
-	
-// 	char *d_graph_visited;
-// 	cudaMalloc( (void**) &d_graph_visited, sizeof(char)*no_of_nodes) ;
-// 	cudaMemcpy( d_graph_visited, h_graph_visited, sizeof(char)*no_of_nodes, cudaMemcpyHostToDevice) ;
+	//--1 transfer data from host to device
 
-// 	int *d_neighbours;
-// 	cudaMalloc( (void**) &d_neighbours, sizeof(int)*edge_list_size) ;
-// 	cudaMemcpy( d_neighbours, h_neighbours, sizeof(int)*edge_list_size, cudaMemcpyHostToDevice) ;
-	
-// 	char *d_over;
-// 	cudaMalloc( (void**) &d_over, sizeof(char)) ;
-	
-// 	int *d_depth;
-// 	cudaMalloc( (void**) &d_depth, sizeof(int)) ;
-	
-// 	int *d_level;
-// 	cudaMalloc( (void**) &d_level, sizeof(int)*no_of_nodes) ;
-// 	cudaMemcpy( d_level, h_level, sizeof(int)*no_of_nodes, cudaMemcpyHostToDevice) ;
-	
-// 	int *d_no_of_nodes;
-// 	cudaMalloc( (void**) &d_no_of_nodes, sizeof(int)) ;
-// 	cudaMemcpy( d_no_of_nodes, &no_of_nodes, sizeof(int), cudaMemcpyHostToDevice) ;
-	
-// 	dim3  grid( num_of_blocks, 1, 1);
-// 	dim3  threads( num_of_threads_per_block, 1, 1);
-	
-// 	// int device;
-// 	// cudaGetDevice(&device);
-// 	// struct cudaDeviceProp properties;
-// 	// cudaGetDeviceProperties(&properties, device);
-// 	// printf("\n\nusing %d multiprocessors\n",properties.multiProcessorCount);
-// 	// printf("max threads per processor: %d\n",properties.maxThreadsPerMultiProcessor);
-// 	// printf("runing with dim3 num_of_blocks %d, num_of_threads_per_block %d\n\n", num_of_blocks, num_of_threads_per_block);
-	
-// 	try{
-// 		//First run pagerank once with level 0 for all nodes who dont have reverse neighbours
-// 		h_depth = -1;
-// 		struct timeval t1, t2;
-// 		double elapsedTime;
-// 		// start timer
-// 		gettimeofday(&t1, NULL);
-// 		do{
-// 			h_over = false;
-// 			h_depth = h_depth + 1;
-// 			// printf("\nNew iterations : traversing current depth %d \n", h_depth);
-// 			cudaMemcpy( d_depth, &h_depth, sizeof(int), cudaMemcpyHostToDevice) ;
-// 			cudaMemcpy( d_over, &h_over, sizeof(char), cudaMemcpyHostToDevice) ;
+	float *d_pagerank;
+	cudaMalloc( (void**) &d_pagerank, sizeof(float)*no_of_nodes) ;
+	cudaMemcpy( d_pagerank, h_pagerank, sizeof(float)*no_of_nodes, cudaMemcpyHostToDevice) ;
+
+	float *d_pagerank_new;
+	cudaMalloc( (void**) &d_pagerank_new, sizeof(float)*no_of_nodes) ;
+	cudaMemcpy( d_pagerank_new, h_pagerank_new, sizeof(float)*no_of_nodes, cudaMemcpyHostToDevice) ;
+
+	Node *d_graph_nodes;
+	cudaMalloc( (void**) &d_graph_nodes, sizeof(Node)*no_of_nodes) ;
+	cudaMemcpy( d_graph_nodes, h_graph_nodes, sizeof(Node)*no_of_nodes, cudaMemcpyHostToDevice) ;
+
+	Edge *d_graph_edges;
+	cudaMalloc( (void**) &d_graph_edges, sizeof(Edge)*edge_list_size) ;
+	cudaMemcpy( d_graph_edges, h_graph_edges, sizeof(Edge)*edge_list_size, cudaMemcpyHostToDevice) ;
+
+	int *d_neighbours;
+	cudaMalloc( (void**) &d_neighbours, sizeof(int)*edge_list_size) ;
+	cudaMemcpy( d_neighbours, h_neighbours, sizeof(int)*edge_list_size, cudaMemcpyHostToDevice) ;
+
+	int *d_no_of_edges;
+	cudaMalloc( (void**) &d_no_of_edges, sizeof(int)) ;
+	cudaMemcpy( d_no_of_edges, &edge_list_size, sizeof(int), cudaMemcpyHostToDevice) ;
+
+	int *d_no_of_nodes;
+	cudaMalloc( (void**) &d_no_of_nodes, sizeof(int)) ;
+	cudaMemcpy( d_no_of_nodes, &no_of_nodes, sizeof(int), cudaMemcpyHostToDevice) ;
+
+	dim3  grid( num_of_blocks, 1, 1);
+	dim3  threads( num_of_threads_per_block, 1, 1);
+
+	// int device;
+	// cudaGetDevice(&device);
+	// struct cudaDeviceProp properties;
+	// cudaGetDeviceProperties(&properties, device);
+	// printf("using %d multiprocessors\n",properties.multiProcessorCount);
+	// printf("max threads per processor: %d\n",properties.maxThreadsPerMultiProcessor);
+	// printf("runing with dim3 num_of_blocks %d, num_of_threads_per_block %d\n", num_of_blocks, num_of_threads_per_block);
+
+	try{
+		int i = 0;
+		struct timeval t1, t2;
+		double elapsedTime;
+		// start timer
+		gettimeofday(&t1, NULL);
+		while(i < NUM_ITERATIONS){
+
+			//Initialize the d_pagerank and d_pagerank_new arrays before invoking the kernel
+			//Not required for the first iteration
+			if (i!=0) {
+				update_pagerank_arrays<<< grid, threads, 0 >>> (d_pagerank, d_pagerank_new, d_no_of_nodes);
+			}
+			cudaError err = cudaGetLastError();
+			if ( cudaSuccess != err )
+			{
+				fprintf( stderr, "cudaCheckError() for kernel launch of update_pagerank_array failed with error : %s\n",
+							cudaGetErrorString( err ) );
+				exit( -1 );
+			}
 			
-// 			vertex_push<<< grid, threads, 0 >>>( d_graph_nodes,
-// 												d_graph_edges, 
-// 												d_no_of_nodes,
-// 												d_over,
-// 												d_depth,
-// 												d_level,
-// 												d_neighbours,
-// 												d_graph_visited);
-// 			cudaError err = cudaGetLastError();
-// 			if ( cudaSuccess != err )
-// 			{
-// 				fprintf( stderr, "cudaCheckError() for kernel launch failed with error : %s\n",
-// 							cudaGetErrorString( err ) );
-// 				exit( -1 );
-// 			}
-// 			cudaDeviceSynchronize(); 
-	
-// 			cudaMemcpy( &h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
-// 		}while(h_over);
-// 		// stop timer
-// 		gettimeofday(&t2, NULL);
-	
-// 		// compute and print the elapsed time in millisec
-// 		// compute and print the elapsed time in millisec
-// 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec to ns
-// 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
-// 		printf("Kernel time : %f ns\n", elapsedTime);
+			cudaDeviceSynchronize();
+
+			vertex_push<<< grid, threads, 0 >>>( 	d_graph_nodes,
+												d_graph_edges, 
+												d_no_of_edges,
+												d_neighbours,
+												d_pagerank,
+												d_pagerank_new);
+			err = cudaGetLastError();
+			if ( cudaSuccess != err )
+			{
+				fprintf( stderr, "cudaCheckError() for pagerank kernel launch failed with error : %s\n",
+							cudaGetErrorString( err ) );
+				exit( -1 );
+			}
+			cudaDeviceSynchronize(); 
+			i++;
+		}
+		// stop timer
+		gettimeofday(&t2, NULL);
+
+		// compute and print the elapsed time in millisec
+		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec to ns
+		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
+		printf("Kernel time : %f ns\n", elapsedTime);
 		
-// 		// printf("No of iterations : %d\n",h_depth);
-	
-// 		// cudaMemcpy(h_level, d_level, sizeof(int)*no_of_nodes, cudaMemcpyDeviceToHost);
-// 		// // cudaDeviceSynchronize(); 
-// 		// printf("New depths are : \n");
-// 		// int max = 0;
-// 		// for (int i=0; i<no_of_nodes; i++) {
-// 		// 	printf("%d : %d, ", i, h_level[i]);
-// 		// 	if (h_level[i] != INT_MAX && h_level[i]>max) max = h_level[i];
-// 		// }
-// 		// printf("\nMaximum depth seen is %d\n",max);
-	
-// 		//--4 release cuda resources.
-// 		cudaFree(d_graph_nodes);
-// 		cudaFree(d_graph_edges);
-// 		cudaFree(d_graph_visited);
-// 		cudaFree(d_no_of_nodes);
-// 		cudaFree(d_neighbours);
-// 		cudaFree(d_over);
-// 		cudaFree(d_depth);
-// 		cudaFree(d_level);
-// 	}
-// 	catch(std::string msg){		
-// 		cudaFree(d_graph_nodes);
-// 		cudaFree(d_graph_edges);
-// 		cudaFree(d_graph_visited);
-// 		cudaFree(d_no_of_nodes);
-// 		cudaFree(d_neighbours);
-// 		cudaFree(d_over);
-// 		cudaFree(d_depth);
-// 		cudaFree(d_level);
-// 		std::string e_str = "in run_transpose_gpu -> ";
-// 		e_str += msg;
-// 		throw(e_str);
-// 	}
-// 	return ;
-// }
+		cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
+		if (cudaSuccess != err) {
+			fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
+			exit(-1);
+		}
+		printf("New pageranks are : \n");
+		int max = 0;
+		for (int i=0; i<no_of_nodes; i++) {
+			printf("%d : %f, ", i, h_pagerank_new[i]);
+		}
+		printf("\n");
+		
+		//--4 release cuda resources.
+		cudaFree(d_graph_nodes);
+		cudaFree(d_graph_edges);
+		cudaFree(d_no_of_edges);
+		cudaFree(d_no_of_nodes);
+		cudaFree(d_pagerank);
+		cudaFree(d_pagerank_new);
+	}
+	catch(std::string msg){		
+		cudaFree(d_graph_nodes);
+		cudaFree(d_graph_edges);
+		cudaFree(d_no_of_edges);
+		cudaFree(d_no_of_nodes);
+		cudaFree(d_pagerank);
+		cudaFree(d_pagerank_new);
+		std::string e_str = "in run_transpose_gpu -> ";
+		e_str += msg;
+		throw(e_str);
+	}
+	return ;
+}
 
-// void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int *h_reverse_neighbours, double *time_taken, char *h_graph_visited)
-// 								throw(std::string) {
+void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list_size, Edge *h_graph_edges, int *h_reverse_neighbours, double *time_taken, char *h_graph_visited)
+								throw(std::string) {
 
-// 	//int number_elements = height*width;
-// 	int h_depth = -1;
-// 	char h_over;
+	float *h_pagerank = (float *) malloc (no_of_nodes*sizeof(float));
+	float *h_pagerank_new = (float *) malloc (no_of_nodes*sizeof(float));
+	for (int i=0; i< no_of_nodes; i++) {
+		h_pagerank[i] = 0.25;
+		h_pagerank_new[i] = 0.0;
+	}
 	
-// 	int *h_level = (int *) malloc (no_of_nodes*sizeof(int)); //store the current minimum depth seen by a node
-// 	for (int i=0; i< no_of_nodes; i++) {
-// 		h_level[i] = INT_MAX;	
-// 		h_graph_visited[i] = false;
-// 	}
-// 	h_level[0] = 0;
-	
-// 	//--1 transfer data from host to device
-	
-// 	Node *d_graph_nodes;
-// 	cudaMalloc( (void**) &d_graph_nodes, sizeof(Node)*no_of_nodes) ;
-// 	cudaMemcpy( d_graph_nodes, h_graph_nodes, sizeof(Node)*no_of_nodes, cudaMemcpyHostToDevice) ;
-	
-// 	Edge *d_graph_edges;
-// 	cudaMalloc( (void**) &d_graph_edges, sizeof(Edge)*edge_list_size) ;
-// 	cudaMemcpy( d_graph_edges, h_graph_edges, sizeof(Edge)*edge_list_size, cudaMemcpyHostToDevice) ;
-	
-// 	char *d_graph_visited;
-// 	cudaMalloc( (void**) &d_graph_visited, sizeof(char)*no_of_nodes) ;
-// 	cudaMemcpy( d_graph_visited, h_graph_visited, sizeof(char)*no_of_nodes, cudaMemcpyHostToDevice) ;
+	//--1 transfer data from host to device
 
-// 	int *d_reverse_neighbours;
-// 	cudaMalloc( (void**) &d_reverse_neighbours, sizeof(int)*edge_list_size) ;
-// 	cudaMemcpy( d_reverse_neighbours, h_reverse_neighbours, sizeof(int)*edge_list_size, cudaMemcpyHostToDevice) ;
-	
-// 	char *d_over;
-// 	cudaMalloc( (void**) &d_over, sizeof(char)) ;
-	
-// 	int *d_depth;
-// 	cudaMalloc( (void**) &d_depth, sizeof(int)) ;
-	
-// 	int *d_level;
-// 	cudaMalloc( (void**) &d_level, sizeof(int)*no_of_nodes) ;
-// 	cudaMemcpy( d_level, h_level, sizeof(int)*no_of_nodes, cudaMemcpyHostToDevice) ;
-	
-// 	int *d_no_of_nodes;
-// 	cudaMalloc( (void**) &d_no_of_nodes, sizeof(int)) ;
-// 	cudaMemcpy( d_no_of_nodes, &no_of_nodes, sizeof(int), cudaMemcpyHostToDevice) ;
-	
-// 	dim3  grid( num_of_blocks, 1, 1);
-// 	dim3  threads( num_of_threads_per_block, 1, 1);
-	
-// 	// int device;
-// 	// cudaGetDevice(&device);
-// 	// struct cudaDeviceProp properties;
-// 	// cudaGetDeviceProperties(&properties, device);
-// 	// printf("\n\nusing %d multiprocessors\n",properties.multiProcessorCount);
-// 	// printf("max threads per processor: %d\n",properties.maxThreadsPerMultiProcessor);
-// 	// printf("runing with dim3 num_of_blocks %d, num_of_threads_per_block %d\n\n", num_of_blocks, num_of_threads_per_block);
-	
-// 	try{
-// 		//First run pagerank once with level 0 for all nodes who dont have reverse reverse_neighbours
-// 		h_depth = -1;
-// 		struct timeval t1, t2;
-// 		double elapsedTime;
-// 		// start timer
-// 		gettimeofday(&t1, NULL);
-// 		do{
-// 			h_over = false;
-// 			h_depth = h_depth + 1;
-// 			// printf("\nNew iterations : traversing current depth %d \n", h_depth);
-// 			cudaMemcpy( d_depth, &h_depth, sizeof(int), cudaMemcpyHostToDevice) ;
-// 			cudaMemcpy( d_over, &h_over, sizeof(char), cudaMemcpyHostToDevice) ;
+	float *d_pagerank;
+	cudaMalloc( (void**) &d_pagerank, sizeof(float)*no_of_nodes) ;
+	cudaMemcpy( d_pagerank, h_pagerank, sizeof(float)*no_of_nodes, cudaMemcpyHostToDevice) ;
+
+	float *d_pagerank_new;
+	cudaMalloc( (void**) &d_pagerank_new, sizeof(float)*no_of_nodes) ;
+	cudaMemcpy( d_pagerank_new, h_pagerank_new, sizeof(float)*no_of_nodes, cudaMemcpyHostToDevice) ;
+
+	Node *d_graph_nodes;
+	cudaMalloc( (void**) &d_graph_nodes, sizeof(Node)*no_of_nodes) ;
+	cudaMemcpy( d_graph_nodes, h_graph_nodes, sizeof(Node)*no_of_nodes, cudaMemcpyHostToDevice) ;
+
+	Edge *d_graph_edges;
+	cudaMalloc( (void**) &d_graph_edges, sizeof(Edge)*edge_list_size) ;
+	cudaMemcpy( d_graph_edges, h_graph_edges, sizeof(Edge)*edge_list_size, cudaMemcpyHostToDevice) ;
+
+	int *d_neighbours;
+	cudaMalloc( (void**) &d_neighbours, sizeof(int)*edge_list_size) ;
+	cudaMemcpy( d_neighbours, h_neighbours, sizeof(int)*edge_list_size, cudaMemcpyHostToDevice) ;
+
+	int *d_no_of_edges;
+	cudaMalloc( (void**) &d_no_of_edges, sizeof(int)) ;
+	cudaMemcpy( d_no_of_edges, &edge_list_size, sizeof(int), cudaMemcpyHostToDevice) ;
+
+	int *d_no_of_nodes;
+	cudaMalloc( (void**) &d_no_of_nodes, sizeof(int)) ;
+	cudaMemcpy( d_no_of_nodes, &no_of_nodes, sizeof(int), cudaMemcpyHostToDevice) ;
+
+	dim3  grid( num_of_blocks, 1, 1);
+	dim3  threads( num_of_threads_per_block, 1, 1);
+
+	// int device;
+	// cudaGetDevice(&device);
+	// struct cudaDeviceProp properties;
+	// cudaGetDeviceProperties(&properties, device);
+	// printf("using %d multiprocessors\n",properties.multiProcessorCount);
+	// printf("max threads per processor: %d\n",properties.maxThreadsPerMultiProcessor);
+	// printf("runing with dim3 num_of_blocks %d, num_of_threads_per_block %d\n", num_of_blocks, num_of_threads_per_block);
+
+	try{
+		int i = 0;
+		struct timeval t1, t2;
+		double elapsedTime;
+		// start timer
+		gettimeofday(&t1, NULL);
+		while(i < NUM_ITERATIONS){
+
+			//Initialize the d_pagerank and d_pagerank_new arrays before invoking the kernel
+			//Not required for the first iteration
+			if (i!=0) {
+				update_pagerank_arrays<<< grid, threads, 0 >>> (d_pagerank, d_pagerank_new, d_no_of_nodes);
+			}
+			cudaError err = cudaGetLastError();
+			if ( cudaSuccess != err )
+			{
+				fprintf( stderr, "cudaCheckError() for kernel launch of update_pagerank_array failed with error : %s\n",
+							cudaGetErrorString( err ) );
+				exit( -1 );
+			}
 			
-// 			vertex_pull<<< grid, threads, 0 >>>( d_graph_nodes,
-// 												d_graph_edges, 
-// 												d_no_of_nodes,
-// 												d_over,
-// 												d_depth,
-// 												d_level,
-// 												d_reverse_neighbours,
-// 												d_graph_visited);
-// 			cudaError err = cudaGetLastError();
-// 			if ( cudaSuccess != err )
-// 			{
-// 				fprintf( stderr, "cudaCheckError() for kernel launch failed with error : %s\n",
-// 							cudaGetErrorString( err ) );
-// 				exit( -1 );
-// 			}
-// 			cudaDeviceSynchronize(); 
-	
-// 			cudaMemcpy( &h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
-// 		}while(h_over);
-// 		// stop timer
-// 		gettimeofday(&t2, NULL);
-	
-// 		// compute and print the elapsed time in millisec
-// 		// compute and print the elapsed time in millisec
-// 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec to ns
-// 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
-// 		printf("Kernel time : %f ns\n", elapsedTime);
+			cudaDeviceSynchronize();
+
+			vertex_push<<< grid, threads, 0 >>>( 	d_graph_nodes,
+												d_graph_edges, 
+												d_no_of_edges,
+												d_neighbours,
+												d_pagerank,
+												d_pagerank_new);
+			err = cudaGetLastError();
+			if ( cudaSuccess != err )
+			{
+				fprintf( stderr, "cudaCheckError() for pagerank kernel launch failed with error : %s\n",
+							cudaGetErrorString( err ) );
+				exit( -1 );
+			}
+			cudaDeviceSynchronize(); 
+			i++;
+		}
+		// stop timer
+		gettimeofday(&t2, NULL);
+
+		// compute and print the elapsed time in millisec
+		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec to ns
+		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
+		printf("Kernel time : %f ns\n", elapsedTime);
 		
-// 		// printf("No of iterations : %d\n",h_depth);
-	
-// 		// cudaMemcpy(h_level, d_level, sizeof(int)*no_of_nodes, cudaMemcpyDeviceToHost);
-// 		// // cudaDeviceSynchronize(); 
-// 		// printf("New depths are : \n");
-// 		// int max = 0;
-// 		// for (int i=0; i<no_of_nodes; i++) {
-// 		// 	printf("%d : %d, ", i, h_level[i]);
-// 		// 	if (h_level[i] != INT_MAX && h_level[i]>max) max = h_level[i];
-// 		// }
-// 		// printf("\nMaximum depth seen is %d\n",max);
-	
-// 		//--4 release cuda resources.
-// 		cudaFree(d_graph_nodes);
-// 		cudaFree(d_graph_edges);
-// 		cudaFree(d_graph_visited);
-// 		cudaFree(d_no_of_nodes);
-// 		cudaFree(d_reverse_neighbours);
-// 		cudaFree(d_over);
-// 		cudaFree(d_depth);
-// 		cudaFree(d_level);
-// 	}
-// 	catch(std::string msg){		
-// 		cudaFree(d_graph_nodes);
-// 		cudaFree(d_graph_edges);
-// 		cudaFree(d_graph_visited);
-// 		cudaFree(d_no_of_nodes);
-// 		cudaFree(d_reverse_neighbours);
-// 		cudaFree(d_over);
-// 		cudaFree(d_depth);
-// 		cudaFree(d_level);
-// 		std::string e_str = "in run_transpose_gpu -> ";
-// 		e_str += msg;
-// 		throw(e_str);
-// 	}
-// 	return ;
-// }
+		cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
+		if (cudaSuccess != err) {
+			fprintf(stderr, "memcopy new pagerank_new from device to host failed with error %s\n", cudaGetErrorString(err));
+			exit(-1);
+		}
+		printf("New pageranks are : \n");
+		int max = 0;
+		for (int i=0; i<no_of_nodes; i++) {
+			printf("%d : %f, ", i, h_pagerank_new[i]);
+		}
+		printf("\n");
+		
+		//--4 release cuda resources.
+		cudaFree(d_graph_nodes);
+		cudaFree(d_graph_edges);
+		cudaFree(d_no_of_edges);
+		cudaFree(d_no_of_nodes);
+		cudaFree(d_pagerank);
+		cudaFree(d_pagerank_new);
+	}
+	catch(std::string msg){		
+		cudaFree(d_graph_nodes);
+		cudaFree(d_graph_edges);
+		cudaFree(d_no_of_edges);
+		cudaFree(d_no_of_nodes);
+		cudaFree(d_pagerank);
+		cudaFree(d_pagerank_new);
+		std::string e_str = "in run_transpose_gpu -> ";
+		e_str += msg;
+		throw(e_str);
+	}
+	return ;
+}
 
 void Usage(int argc, char**argv){
 
@@ -612,10 +601,7 @@ int main(int argc, char * argv[])
 		// for (int i=0; i<5; i++)
 			run_pagerank_gpu_edgelist(no_of_nodes, h_graph_nodes,edge_list_size,h_graph_edges, &time_taken);	
 			
-		// std::cout<<std::endl<<"Reverse Edgelist Implementation"<<std::endl;
-		// for (int i=0; i<5; i++)
-		// 	run_pagerank_gpu_reverse_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_visited, &time_taken);	
-
+		
 		num_of_blocks = 1;
 		// num_of_threads_per_block = no_of_nodes;
 		num_of_threads_per_block = no_of_nodes;
@@ -626,9 +612,9 @@ int main(int argc, char * argv[])
 			num_of_threads_per_block = MAX_THREADS_PER_BLOCK; 
 		}
 
-		// std::cout<<std::endl<<"Vertex Push Implementation"<<std::endl;
+		std::cout<<std::endl<<"Vertex Push Implementation"<<std::endl;
 		// for (int i=0; i<5; i++)
-		// 	run_pagerank_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken, h_graph_visited);
+			run_pagerank_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
 		// std::cout<<std::endl<<"Vertex Pull Implementation"<<std::endl;
 		// for (int i=0; i<5; i++)	
 		// 	run_pagerank_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
