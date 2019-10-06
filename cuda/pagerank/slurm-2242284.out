@@ -1,0 +1,7 @@
+Number of nodes read are : 6
+Number of edges read are : 7
+
+Edgelist Implementation
+In the edgelist function
+Before calling any cuda functions
+Kernel time : 850000.000000 ns
