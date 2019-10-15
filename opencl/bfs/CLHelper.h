@@ -130,7 +130,8 @@ void _clCmdParams(int argc, char* argv[]){
 //--revised on 04/01/2011: get the number of devices  and 
 //  devices have no relationship with context
 void _clInit()
-{
+{	
+	// printf("Entered clInit\n");
     int DEVICE_ID_INUSED = device_id_inused;
     cl_int resultCL;
     
@@ -147,10 +148,11 @@ void _clInit()
     cl_uint numPlatforms;
     cl_platform_id targetPlatform = NULL;
 
+	// printf("Before clGetPlatformIDs\n");
     resultCL = clGetPlatformIDs(0, NULL, &numPlatforms);
     if (resultCL != CL_SUCCESS)
         throw (string("InitCL()::Error: Getting number of platforms (clGetPlatformIDs)"));
-    //printf("number of platforms:%d\n",numPlatforms);	//by cambine
+    // printf("number of platforms:%d\n",numPlatforms);	//by cambine
 
     if (!(numPlatforms > 0))
         throw (string("InitCL()::Error: No platforms found (clGetPlatformIDs)"));
@@ -174,7 +176,7 @@ void _clInit()
         if (resultCL != CL_SUCCESS)
             throw (string("InitCL()::Error: Getting platform info (clGetPlatformInfo)"));
 
-		//printf("vedor is %s\n",pbuff);
+		// printf("vedor is %s\n",pbuff);
 
     }
     free(allPlatforms);
@@ -200,7 +202,7 @@ void _clInit()
    if (deviceListSize == 0)
         throw(string("InitCL()::Error: No devices found."));
 
-    //std::cout<<"device number:"<<deviceListSize<<std::endl;
+    // std::cout<<"device number:"<<deviceListSize<<std::endl;
 
     /* Now, allocate the device list */
     oclHandles.devices = (cl_device_id *)malloc(deviceListSize * sizeof(cl_device_id));

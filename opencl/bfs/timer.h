@@ -16,6 +16,7 @@ class timer {
 	std::ostream   	   &print(std::ostream &);
 
 	double             getTimeInSeconds();
+    double             getTimeInNanoSeconds();
 
     private:
 	void		   print_time(std::ostream &, const char *which, double time) const;
