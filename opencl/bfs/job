@@ -9,4 +9,4 @@
 
 module load opencl-nvidia/10.0
 
-./bfs 0 /var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.e /var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.v
+./bfs 4 /var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-23.e /var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-23.v

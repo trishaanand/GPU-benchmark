@@ -36,7 +36,7 @@ struct oclHandleStruct oclHandles;
 char kernel_file[100]  = "Kernels.cl";
 int total_kernels = 6;
 string kernel_names[6] = {"BFS_1", "BFS_2", "edgelist", "reverse_edgelist", "vertex_push", "vertex_pull"};
-int work_group_size = 512;
+// int work_group_size = 512;
 int device_id_inused = 0; //deviced id used (default : 0)
 
 /*
@@ -98,7 +98,7 @@ void _clCmdParams(int argc, char* argv[]){
 		case 'g':	//--g stands for size of work group
 			if (++i < argc)
 			{
-				sscanf(argv[i], "%u", &work_group_size);
+				// sscanf(argv[i], "%u", &work_group_size);
 			}
 			else
 			{

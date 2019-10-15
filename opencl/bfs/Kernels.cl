@@ -56,10 +56,7 @@ __kernel void BFS_2(__global char* g_graph_mask,
 }
 
 //--10 parameters
-__kernel void edgelist( const __global Node* g_graph_nodes,
-					const __global Edge* g_graph_edges, 
-					__global char* g_graph_mask, 
-					__global char* g_updating_graph_mask, 
+__kernel void edgelist( const __global Edge* g_graph_edges, 
 					__global char* g_graph_visited, 
 					const  int no_of_edges,
 					__global char* g_over,
@@ -67,7 +64,7 @@ __kernel void edgelist( const __global Node* g_graph_nodes,
 					__global int* g_level) {
 
 	int tid = get_global_id(0);
-
+	// printf("tid : %d - kernel execution edgelist has started\n", tid);
 	if( (tid<no_of_edges) && (g_graph_visited[g_graph_edges[tid].out_vertex] != true) &&(g_level[g_graph_edges[tid].in_vertex]==*g_depth)){
 
 		int new_depth = *g_depth + 1;
@@ -76,6 +73,7 @@ __kernel void edgelist( const __global Node* g_graph_nodes,
 		if (atomic_min(&g_level[g_graph_edges[tid].out_vertex], new_depth) > new_depth) {
 			 //atomic min returns the old value and updates the first argument with the minimum.
 			//if the depth seen by a node is higher than the current new depth, we should try more depths
+			// printf("new depth : %d,  tid : %d, in vertex : %d, out vertex : %d\n", new_depth, tid, g_graph_edges[tid].in_vertex, g_graph_edges[tid].out_vertex);
 			*g_over=true;
 		}
 	}	
@@ -93,7 +91,7 @@ __kernel void reverse_edgelist( const __global Node* g_graph_nodes,
 					__global int* g_level) {
 
 	int tid = get_global_id(0);
-
+	// printf("tid : %d - kernel execution reverse-edgelist has started\n", tid);
 	if( (tid<no_of_edges) && (g_graph_visited[g_graph_edges[tid].in_vertex] != true) && (g_level[g_graph_edges[tid].out_vertex]==*g_depth)){
 
 		int new_depth = *g_depth + 1;
@@ -156,9 +154,9 @@ __kernel void vertex_pull( const __global Node* g_graph_nodes,
 		int max = starting + g_graph_nodes[tid].no_of_reverse_edges;
 		for (int i=starting; i<max; i++ ) {
 			int neighbour_index = g_reverse_neighbours[i];
-			// printf("For tid %d, level of neighbour %d is %d  and is being compared to %d\n", tid, neighbour_index, g_level[neighbour_index], *g_depth);
+			printf("For tid %d, level of neighbour %d is %d  and is being compared to %d\n", tid, neighbour_index, g_level[neighbour_index], *g_depth);
 			if (g_level[neighbour_index] == *g_depth) {
-				// printf("Inside kernel processing new rank %d for node index %d\n", new_depth, tid);
+				printf("Inside kernel processing new rank %d for node index %d\n", new_depth, tid);
 				g_level[tid] = new_depth;
 				*g_over = true;
 				g_graph_visited[tid] = true;

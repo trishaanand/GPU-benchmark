@@ -1,0 +1,16 @@
+Number of nodes read are : 8388608
+Number of edges read are : 129333677
+Starting node is : 0
+Edgelist Implementation
+kernel time(s):1.17079e+09
+kernel time(s):1.17592e+09
+kernel time(s):1.17512e+09
+kernel time(s):1.17469e+09
+kernel time(s):1.17109e+09
+kernel time(s):1.16328e+09
+Reverse Edgelist Implementation
+kernel time(s):7.55763e+08
+kernel time(s):7.50333e+08
+kernel time(s):7.4408e+08
+kernel time(s):7.46484e+08
+kernel time(s):7.44272e+08
