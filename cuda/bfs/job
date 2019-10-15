@@ -9,5 +9,5 @@
 
 module load cuda10.0
 
-./bfs
+./bfs 4 /var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-23.e /var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-23.v
 

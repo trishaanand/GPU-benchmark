@@ -11,7 +11,7 @@ typedef struct
 }Node;
 
 typedef struct {
-	int in_vertex;
+    int in_vertex;
 	int out_vertex;
 }Edge;
 
@@ -76,13 +76,17 @@ __global__ void vertex_push( Node* g_graph_nodes,
         int new_depth = *g_depth + 1;
         int starting = g_graph_nodes[tid].starting;
         int max = starting + g_graph_nodes[tid].no_of_edges;
+        // printf("At %d. starting : %d, max : %d, neighbours array is [%d %d %d %d %d %d %d]\n", tid, starting, max, g_neighbours[0], g_neighbours[1],
+        //         g_neighbours[2], g_neighbours[3], g_neighbours[4], g_neighbours[5], g_neighbours[6]);
         for (int i=starting; i<max; i++ ) {
             int neighbour_index = g_neighbours[i];
+            // printf("\nAt %d. Before checking vertex %d , graph_visited %c , level %d\n", tid, neighbour_index, g_graph_visited[neighbour_index], g_level[neighbour_index]);
             if (g_graph_visited[neighbour_index] != true) {
                 g_graph_visited[neighbour_index] = true;
                 if (atomicMin(&g_level[neighbour_index], new_depth) > new_depth) {
                     //atomic min returns the old value
                     //if the depth seen by a node is higher than the current new depth, we should try more depths
+                    // printf("At %d. Updating vertex %d to depth %d. \n", tid, neighbour_index, g_level[neighbour_index]);
                     *g_over=true;
                 }
             }
@@ -100,25 +104,23 @@ __global__ void vertex_pull(  Node* g_graph_nodes,
      char* g_graph_visited) {
 
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
     int new_depth = *g_depth + 1;
-        if( (tid<*no_of_nodes) && (g_graph_visited[tid]!=true)){
-
-
+    
+    if( (tid < *no_of_nodes) && (g_graph_visited[tid]!=true)) {
         int starting = g_graph_nodes[tid].reverse_starting;
         int max = starting + g_graph_nodes[tid].no_of_reverse_edges;
+
+        // printf("At %d. starting : %d, max : %d\n", tid, starting, max);
         for (int i=starting; i<max; i++ ) {
             int neighbour_index = g_reverse_neighbours[i];
-            // printf("For tid %d, level of neighbour %d is %d  and is being compared to %d\n", tid, neighbour_index, g_level[neighbour_index], *g_depth);
             if (g_level[neighbour_index] == *g_depth) {
-                // printf("Inside kernel processing new rank %d for node index %d\n", new_depth, tid);
                 g_level[tid] = new_depth;
                 *g_over = true;
                 g_graph_visited[tid] = true;
                 // break; 
             }
         }
-    }	
+    } 
 }
 
    
