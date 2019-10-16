@@ -17,7 +17,7 @@
 #include "CLHelper.h"
 #include "util.h"
 
-#define MAX_THREADS_PER_BLOCK 512
+#define MAX_THREADS_PER_BLOCK 256
 
 //Structure to hold a node information
 struct Node
@@ -34,6 +34,7 @@ struct Edge {
 };
 
 int bfs_starting_node = 0;
+int work_group_size;
 
 bool edge_compare(Edge lhs, Edge rhs) {
 	return (lhs.in_vertex < rhs.in_vertex);
@@ -208,8 +209,10 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 	int *h_level = (int *) malloc (no_of_nodes*sizeof(int)); //store the current minimum depth seen by a node
 	for (int i=0; i< no_of_nodes; i++) {
 		h_level[i] = INT_MAX;	
+		h_graph_visited[i] = false;
 	}
 	h_level[bfs_starting_node] = 0;
+	// h_level[bfs_starting_node] = true;
 	// std::cout<<"Before cl_mem and init"<<std::endl;
 	cl_mem d_graph_nodes, d_graph_edges, d_graph_mask, d_updating_graph_mask, \
 			d_graph_visited, d_over, d_depth, d_level;
@@ -221,31 +224,36 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		d_graph_visited = _clMallocRW(no_of_nodes*sizeof(char), h_graph_visited);
 
 		d_over = _clMallocRW(sizeof(char), &h_over);
-		d_depth = _clMalloc(sizeof(int), &h_depth);
+		d_depth = _clMallocRW(sizeof(int), &h_depth);
 
 		d_level = _clMallocRW(no_of_nodes*sizeof(int), h_level);
 		
 		_clMemcpyH2D(d_graph_edges, edge_list_size*sizeof(Edge), h_graph_edges);	
 		_clMemcpyH2D(d_graph_visited, no_of_nodes*sizeof(char), h_graph_visited);
 		_clMemcpyH2D(d_level, no_of_nodes*sizeof(int), h_level);	
-		
-		_clFinish();	
+		// _clFinish();
 		//--2 invoke kernel
 #ifdef	PROFILING
-		timer kernel_timer;
-		double kernel_time = 0.0;		
+		timer kernel_timer, iteration_timer;
+		double kernel_time = 0.0;
+		double iteration_time = 0.0;		
 		kernel_timer.reset();
 		kernel_timer.start();
 #endif
 		//First run BFS once with level 0 for all nodes who dont have reverse neighbours
 		h_depth = -1;
+		
 		do{
+			iteration_timer.reset();
+			iteration_timer.start();
 			h_over = false;
 			h_depth = h_depth + 1;
 			
 			_clMemcpyH2D(d_over, sizeof(char), &h_over);
 			_clMemcpyH2D(d_depth, sizeof(int), &h_depth);
 			
+			// printf("In the iteration %d\n", h_depth);
+
 			int kernel_id = 2;
 			int kernel_idx = 0;
 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
@@ -259,58 +267,13 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 			_clInvokeKernel(kernel_id, edge_list_size, work_group_size);
 			
 			_clMemcpyD2H(d_over,sizeof(char), &h_over);
+			// _clFinish();
+			iteration_timer.stop();
+			iteration_time = iteration_timer.getTimeInNanoSeconds();
+			std::cout<<"Iteration "<<h_depth<<", time(ns) : "<<iteration_time<<std::endl;
 		}while(h_over);
-		// std::cout<<"First bfs, no of iterations : "<<h_depth<<std::endl;
-
-		// //Update the h_graph_visited array
-		// _clMemcpyD2H(d_graph_visited,no_of_nodes*sizeof(char), h_graph_visited);
-		// //Update the h_level array
-		// _clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_level);
-
-		// //Now run BFS for all the graph nodes which were disconnected from the above.
-		// int num_of_starting_points = 0;
-		// for (int i=0; i<no_of_nodes; i++) {
-		// 	if (h_graph_visited[i] != true) {
-		// 		num_of_starting_points++;
-		// 		//Start BFS from the ith node
-		// 		h_level[i] = 0;
-		// 		h_graph_visited[i] = true;
-		// 		_clMemcpyH2D(d_graph_visited, no_of_nodes*sizeof(char), h_graph_visited);
-		// 		_clMemcpyH2D(d_level, no_of_nodes*sizeof(int), h_level);
-		// 		h_depth = -1;
-				
-		// 		do{
-		// 			h_over = false;
-		// 			h_depth = h_depth + 1;
-					
-		// 			_clMemcpyH2D(d_over, sizeof(char), &h_over);
-		// 			_clMemcpyH2D(d_depth, sizeof(int), &h_depth);
-					
-		// 			int kernel_id = 2;
-		// 			int kernel_idx = 0;
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_graph_mask);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_updating_graph_mask);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_graph_visited);
-		// 			_clSetArgs(kernel_id, kernel_idx++, &edge_list_size, sizeof(int));
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_over);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_depth);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_level);
-					
-		// 			//int work_items = no_of_nodes;
-		// 			_clInvokeKernel(kernel_id, edge_list_size, work_group_size);
-					
-		// 			_clMemcpyD2H(d_over,sizeof(char), &h_over);
-		// 		}while(h_over);
-		// 		//Update the h_graph_visited array
-		// 		_clMemcpyD2H(d_graph_visited,no_of_nodes*sizeof(char), h_graph_visited);
-		// 		//Update the h_level array
-		// 		_clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_level);
-		// 	}
-		// }
-
-		_clFinish();
+		
+		// _clFinish();
 		// std::cout<<"Number of starting points : "<<num_of_starting_points<<std::endl;
 #ifdef	PROFILING
 		kernel_timer.stop();
@@ -399,14 +362,18 @@ void run_bfs_gpu_reverse_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge
 			
 		//--2 invoke kernel
 #ifdef	PROFILING
-		timer kernel_timer;
-		double kernel_time = 0.0;		
+		timer kernel_timer, iteration_timer;
+		double kernel_time = 0.0;
+		double iteration_time = 0.0;		
 		kernel_timer.reset();
 		kernel_timer.start();
 #endif
 		//First run BFS once with level 0 for all nodes who dont have reverse neighbours
 		h_depth = -1;
+		
 		do{
+			iteration_timer.reset();
+			iteration_timer.start();
 			h_over = false;
 			h_depth = h_depth + 1;
 			
@@ -429,6 +396,9 @@ void run_bfs_gpu_reverse_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge
 			_clInvokeKernel(kernel_id, edge_list_size, work_group_size);
 			
 			_clMemcpyD2H(d_over,sizeof(char), &h_over);
+			iteration_timer.stop();
+			iteration_time = iteration_timer.getTimeInNanoSeconds();
+			std::cout<<"Iteration "<<h_depth<<", time(ns) : "<<iteration_time<<std::endl;
 		}while(h_over);
 		// std::cout<<"First bfs, no of iterations : "<<h_depth<<std::endl;
 
@@ -563,15 +533,18 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 			
 		//--2 invoke kernel
 #ifdef	PROFILING
-		timer kernel_timer;
-		double kernel_time = 0.0;		
+		timer kernel_timer, iteration_timer;
+		double kernel_time = 0.0;
+		double iteration_time = 0.0;		
 		kernel_timer.reset();
 		kernel_timer.start();
 #endif
-		
 		//First run BFS once with level 0 for all nodes who dont have reverse neighbours
 		h_depth = -1;
+		
 		do{
+			iteration_timer.reset();
+			iteration_timer.start();
 			h_over = false;
 			h_depth = h_depth + 1;
 			
@@ -593,6 +566,9 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 			_clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
 			
 			_clMemcpyD2H(d_over,sizeof(char), &h_over);
+			iteration_timer.stop();
+			iteration_time = iteration_timer.getTimeInNanoSeconds();
+			std::cout<<"Iteration "<<h_depth<<", time(ns) : "<<iteration_time<<std::endl;
 		}while(h_over);
 			
 		// //Now run BFS for all the graph nodes which were disconnected from the above.
@@ -712,8 +688,9 @@ void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list
 			
 		//--2 invoke kernel
 #ifdef	PROFILING
-		timer kernel_timer;
-		double kernel_time = 0.0;		
+		timer kernel_timer, iteration_timer;
+		double kernel_time = 0.0;
+		double iteration_time = 0.0;		
 		kernel_timer.reset();
 		kernel_timer.start();
 #endif
@@ -721,6 +698,8 @@ void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		h_depth = -1;
 		
 		do{
+			iteration_timer.reset();
+			iteration_timer.start();
 			h_over = false;
 			h_depth = h_depth + 1;
 			if (!h_over)
@@ -747,6 +726,9 @@ void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list
 			// 	std::cout<<"End of iteration, h_over is "<<h_over<<std::endl;
 			// else
 			// 	std::cout<<"End of do-while loop"<<std::endl;
+			iteration_timer.stop();
+			iteration_time = iteration_timer.getTimeInNanoSeconds();
+			std::cout<<"Iteration "<<h_depth<<", time(ns) : "<<iteration_time<<std::endl;
 		}while(h_over);
 
 		// //Update the h_graph_visited array
@@ -811,7 +793,7 @@ void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		*time_taken = kernel_time;
 			
 #endif
-		_clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_level);
+		// _clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_level);
 		// std::cout<<"New depths are : "<<std::endl;
 		// int max = 0;
 		// for (int i=0; i<no_of_nodes; i++) {
@@ -1022,10 +1004,10 @@ int main(int argc, char * argv[])
 		work_group_size = num_of_threads_per_block;
 		
 		std::cout<<"Edgelist Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		// for (int i=0; i<6; i++)
 			run_bfs_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, &time_taken);	
-		std::cout<<"Reverse Edgelist Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		std::cout<<std::endl<<"Reverse Edgelist Implementation"<<std::endl;
+		// for (int i=0; i<5; i++)
 			run_bfs_gpu_reverse_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, &time_taken);
 
 		num_of_blocks = 1;
@@ -1040,11 +1022,11 @@ int main(int argc, char * argv[])
 		work_group_size = num_of_threads_per_block;
 		
 
-		std::cout<<"Vertex Push Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		std::cout<<std::endl<<"Vertex Push Implementation"<<std::endl;
+		// for (int i=0; i<5; i++)
 			run_bfs_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken, h_graph_visited);
-		std::cout<<"Vertex Pull Implementation"<<std::endl;
-		for (int i=0; i<5; i++)	
+		std::cout<<std::endl<<"Vertex Pull Implementation"<<std::endl;
+		// for (int i=0; i<5; i++)	
 			run_bfs_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
 		//---------------------------------------------------------
 		//--cpu entry
