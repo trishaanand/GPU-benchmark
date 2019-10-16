@@ -17,7 +17,7 @@
 #include "CLHelper.h"
 #include "util.h"
 
-#define MAX_THREADS_PER_BLOCK 256
+#define MAX_THREADS_PER_BLOCK 512
 #define NUM_ITERATIONS 50
 
 //Structure to hold a node information
@@ -55,7 +55,6 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 	// std::cout<<"Reached the function call"<<std::endl;
 	float *h_pagerank = (float *) malloc (no_of_nodes*sizeof(float));
 	float *h_pagerank_new = (float *) malloc (no_of_nodes*sizeof(float));
-	float *temp;
 	for (int i=0; i< no_of_nodes; i++) {
 		h_pagerank[i] = 0.25;
 		h_pagerank_new[i] = 0.0;
@@ -122,17 +121,17 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		
 #ifdef	PROFILING
 		kernel_timer.stop();
-		kernel_time = kernel_timer.getTimeInSeconds();
+		kernel_time = kernel_timer.getTimeInNanoSeconds();
 		*time_taken = kernel_time;
 #endif
 		//--3 transfer data from device to host
-		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
-		std::cout<<"New page ranks are "<<std::endl;
-		// if (h_pagerank_new[j] != 0) {
-		for (j=0; j<9; j++) {
-			std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
-		}
-		std::cout<<std::endl;
+		// _clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
+		// std::cout<<"New page ranks are "<<std::endl;
+		// // if (h_pagerank_new[j] != 0) {
+		// for (j=0; j<9; j++) {
+		// 	std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
+		// }
+		// std::cout<<std::endl;
 		//--statistics
 #ifdef	PROFILING
 		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;		
@@ -242,19 +241,19 @@ void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge
 		
 #ifdef	PROFILING
 		kernel_timer.stop();
-		kernel_time = kernel_timer.getTimeInSeconds();
+		kernel_time = kernel_timer.getTimeInNanoSeconds();
 		*time_taken = kernel_time;
 			
 #endif
 		//--3 transfer data from device to host
-		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
-		std::cout<<"New page ranks are "<<std::endl;
-		// if (h_pagerank_new[j] != 0) {
-		for (j=0; j<9; j++) {
-		    // if (h_pagerank_new[j] != 0.25)
-			    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
-		}
-		std::cout<<std::endl;
+		// _clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
+		// std::cout<<"New page ranks are "<<std::endl;
+		// // if (h_pagerank_new[j] != 0) {
+		// for (j=0; j<9; j++) {
+		//     // if (h_pagerank_new[j] != 0.25)
+		// 	    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
+		// }
+		// std::cout<<std::endl;
 
 #ifdef  PROFILING
 		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;	
@@ -363,18 +362,18 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 		
 #ifdef	PROFILING
 		kernel_timer.stop();
-		kernel_time = kernel_timer.getTimeInSeconds();
+		kernel_time = kernel_timer.getTimeInNanoSeconds();
 		*time_taken = kernel_time;
 			
 #endif
 		//--3 transfer data from device to host
-		_clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
-		std::cout<<"New page ranks are "<<std::endl;
-		// if (h_pagerank_new[j] != 0) {
-		for (j=0; j<9; j++) {
-			    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
-		}
-		std::cout<<std::endl;
+		// _clMemcpyD2H(d_pagerank_new,no_of_nodes*sizeof(float), h_pagerank_new);
+		// std::cout<<"New page ranks are "<<std::endl;
+		// // if (h_pagerank_new[j] != 0) {
+		// for (j=0; j<9; j++) {
+		// 	    std::cout<<j<<" : "<<h_pagerank_new[j]<<", ";
+		// }
+		// std::cout<<std::endl;
 
 #ifdef  PROFILING
 		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;	
@@ -451,11 +450,17 @@ int main(int argc, char * argv[])
 	FILE *fp;
 	Node* h_graph_nodes;
 	char *h_graph_mask, *h_updating_graph_mask, *h_graph_visited;
+	char *input_fe, *input_fv;
+
+	if (argc != 3) {
+		printf("Usage is <edge-file> <vertex-file\n");
+		exit(-1);
+	}
+
+	input_fe = argv[1];
+	input_fv = argv[2];
+
 	try{
-		/* For now, read the input files directly instead of reading from i/o*/
-		char *input_fe = "/var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.e";
-		char *input_fv = "/var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.v";
-	
 		no_of_nodes = read_and_return_no_of_nodes(input_fv);
 		printf("Number of nodes read are : %d\n", no_of_nodes);
 		edge_list_size = read_and_return_no_of_edges(input_fe);
@@ -469,16 +474,6 @@ int main(int argc, char * argv[])
 		}
 		int source = 0;
 
-		int num_of_blocks = 1;
-		int num_of_threads_per_block = no_of_nodes;
-
-		//Make execution Parameters according to the number of nodes
-		//Distribute threads across multiple Blocks if necessary
-		if(no_of_nodes>MAX_THREADS_PER_BLOCK){
-			num_of_blocks = (int)ceil(no_of_nodes/(double)MAX_THREADS_PER_BLOCK); 
-			num_of_threads_per_block = MAX_THREADS_PER_BLOCK; 
-		}
-		work_group_size = num_of_threads_per_block;
 		// allocate host memory
 		h_graph_nodes = (Node*) malloc(sizeof(Node)*no_of_nodes);
 		for (int i=0; i < no_of_nodes; i++) {
@@ -546,16 +541,40 @@ int main(int argc, char * argv[])
 		double time_taken = 0;
 		//---------------------------------------------------------
 		//--gpu entry
+
+		int num_of_blocks = 1;
+		int num_of_threads_per_block = edge_list_size;
+
+		//Make execution Parameters according to the number of edges
+		//Distribute threads across multiple Blocks if necessary
+		if(edge_list_size>MAX_THREADS_PER_BLOCK){
+			num_of_blocks = (int)ceil(edge_list_size/(double)MAX_THREADS_PER_BLOCK); 
+			num_of_threads_per_block = MAX_THREADS_PER_BLOCK; 
+		}
+		work_group_size = num_of_threads_per_block;
+		
+
 		std::cout<<endl<<"Edgelist Implementation"<<std::endl;
-		// for (int i=0; i<5; i++)
+		for (int i=0; i<5; i++)
 			run_pagerank_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, false, &time_taken);	
 		
+		num_of_blocks = 1;
+		num_of_threads_per_block = no_of_nodes;
+
+		//Make execution Parameters according to the number of nodes
+		//Distribute threads across multiple Blocks if necessary
+		if(no_of_nodes>MAX_THREADS_PER_BLOCK){
+			num_of_blocks = (int)ceil(no_of_nodes/(double)MAX_THREADS_PER_BLOCK); 
+			num_of_threads_per_block = MAX_THREADS_PER_BLOCK; 
+		}
+		work_group_size = num_of_threads_per_block;
+
 		std::cout<<endl<<"Vertex Push Implementation"<<std::endl;
-		// for (int i=0; i<5; i++)
+		for (int i=0; i<5; i++)
 			run_pagerank_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken);
 		
 		std::cout<<endl<<"Vertex Pull Implementation"<<std::endl;
-		// for (int i=0; i<5; i++)
+		for (int i=0; i<5; i++)
 			run_pagerank_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken);
 		
 		//release host memory		

@@ -76,3 +76,10 @@ double timer::getTimeInSeconds()
     double res = (total / 1000000.0) / CPU_speed_in_MHz;
     return res;
 }
+
+double timer::getTimeInNanoSeconds() {
+    double total = static_cast<double>(total_time);
+    double res = (total * 1000.0) / CPU_speed_in_MHz;
+    return res;
+}
+

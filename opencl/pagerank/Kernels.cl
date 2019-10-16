@@ -76,10 +76,12 @@ __kernel void edgelist( const __global Node* g_graph_nodes,
 	int tid = get_global_id(0);
 
 	if(tid<no_of_edges) {
+		
+		Edge current_edge = g_graph_edges[tid];
 
 		float new_rank = 0.0f;
-		int in_vertex = g_graph_edges[tid].in_vertex;
-		int out_vertex = g_graph_edges[tid].out_vertex;
+		int in_vertex = current_edge.in_vertex;
+		int out_vertex = current_edge.out_vertex;
 		int degree = g_graph_nodes[in_vertex].no_of_edges;
 		
 		if (degree != 0) new_rank = g_pagerank[in_vertex] / degree;
@@ -99,14 +101,14 @@ __kernel void vertex_push( const __global Node* g_graph_nodes,
 	int tid = get_global_id(0);
 
 	if (tid<no_of_nodes) {
-
+		Node current_node = g_graph_nodes[tid];
 		float new_rank = 0.0f;
-		int degree = g_graph_nodes[tid].no_of_edges;
+		int degree = current_node.no_of_edges;
 		if (degree!=0) 
 			new_rank = g_pagerank[tid] / degree;
 
-		int starting = g_graph_nodes[tid].starting;
-		int max = starting + g_graph_nodes[tid].no_of_edges;
+		int starting = current_node.starting;
+		int max = starting + current_node.no_of_edges;
 		// printf("For node %d, starting is : %d and max is : %d\n", tid, starting, max);
 		for (int i=starting; i<max; i++ ) {
 			float_atomic_add(&g_pagerank_new[g_neighbours[i]], new_rank);
@@ -131,23 +133,26 @@ __kernel void vertex_pull( const __global Node* g_graph_nodes,
 
 		//initialize to the last page rank seen by the vertex
 		float new_rank = 0.0f; 
-	
-		int starting = g_graph_nodes[tid].reverse_starting;
-		int max = starting + g_graph_nodes[tid].no_of_reverse_edges;
+
+		Node current_node = g_graph_nodes[tid];
+
+		int starting = current_node.reverse_starting;
+		int max = starting + current_node.no_of_reverse_edges;
 		
 		// if (tid == 0) 
 		// 	printf("For %d, starting is : %d and max is %d\n\n", tid, starting, max);
 
 		for (int i=starting; i<max; i++ ) {
 			int neighbour_index = g_reverse_neighbours[i];
-			float neighbour_rank = (g_pagerank[neighbour_index])/(g_graph_nodes[neighbour_index].no_of_edges);
-			int degree = g_graph_nodes[neighbour_index].no_of_edges;
-			if (degree != 0) new_rank += neighbour_rank;
+			Node neighbour_node = g_graph_nodes[neighbour_index];
+
+			int degree = neighbour_node.no_of_edges;
+			if (degree != 0) new_rank += (g_pagerank[neighbour_index])/degree;
 			// if(tid==0) {
 			// 	printf("%d : Added rank of vertex %d which was %f\n", tid, neighbour_index, neighbour_rank);
 			// }
 		}
-		g_pagerank_new[tid] = new_rank;
+		g_pagerank_new[tid] += new_rank;
 	}	
 }
 
