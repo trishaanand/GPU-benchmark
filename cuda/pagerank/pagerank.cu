@@ -125,9 +125,9 @@ void run_pagerank_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_li
 		gettimeofday(&t2, NULL);
 
 		// compute and print the elapsed time in millisec
-		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec to ns
+		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec 
 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
-		printf("Kernel time : %f ns\n", elapsedTime);
+		printf("Kernel time : %g ns\n", elapsedTime);
 		
 		// cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
 		// if (cudaSuccess != err) {
@@ -259,7 +259,7 @@ void run_pagerank_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge
 		// compute and print the elapsed time in millisec
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec to ns
 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
-		printf("Kernel time : %f ns\n", elapsedTime);
+		printf("Kernel time : %g ns\n", elapsedTime);
 		
 		// cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
 		// if (cudaSuccess != err) {
@@ -391,7 +391,7 @@ void run_pagerank_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge
 		// compute and print the elapsed time in millisec
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec to ns
 		elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
-		printf("Kernel time : %f ns\n", elapsedTime);
+		printf("Kernel time : %g ns\n", elapsedTime);
 		
 		// cudaError err = cudaMemcpy((void *) h_pagerank_new, (void *) d_pagerank_new, no_of_nodes*sizeof(float), cudaMemcpyDeviceToHost);
 		// if (cudaSuccess != err) {
@@ -472,15 +472,17 @@ int main(int argc, char * argv[])
 	FILE *fp;
 	Node* h_graph_nodes;
 	char *h_graph_mask, *h_updating_graph_mask, *h_graph_visited;
-	try{
-		/* For now, read the input files directly instead of reading from i/o*/
-		char *input_fe = "/var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.e";
-		char *input_fv = "/var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.v";
+	char *input_fe, *input_fv;
 
-		// char *input_fe = "trisha-file.e";
-		// char *input_fv = "trisha-file.v";
-	
-		// char *input_fe = "/home/tanand/rodinia_3.1/graph500-10-superconnected.e";
+	if (argc != 3) {
+		printf("Usage is <edge-file> <vertex-file\n");
+		exit(-1);
+	}
+
+	input_fe = argv[1];
+	input_fv = argv[2];
+
+	try{
 		
 		no_of_nodes = read_and_return_no_of_nodes(input_fv);
 		// no_of_nodes = 1025;
