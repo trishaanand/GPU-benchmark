@@ -15,12 +15,6 @@ typedef struct {
 	int out_vertex;
 }Edge;
 
-__device__ int nonAtomicMin(int *val1, int val2) {
-    if (*val1 > val2) {
-        *val1 = val2;
-    }
-    return *val1;
-}
 
 __global__ void edgelist( Node* g_graph_nodes, Edge* g_graph_edges, char* g_graph_visited, int* no_of_edges, char* g_over, int * g_depth, int* g_level) {
 
@@ -34,7 +28,11 @@ __global__ void edgelist( Node* g_graph_nodes, Edge* g_graph_edges, char* g_grap
         int new_depth = *g_depth + 1;
         // g_graph_visited[g_graph_edges[tid].in_vertex] = true;
         g_graph_visited[g_graph_edges[tid].out_vertex] = true;
-        if (nonAtomicMin(&g_level[g_graph_edges[tid].out_vertex], new_depth) > new_depth) {
+        // if (g_level[g_graph_edges[tid].out_vertex] > new_depth) {
+		// 	g_level[g_graph_edges[tid].out_vertex] = new_depth;
+		// 	*g_over = true;
+		// }
+        if (atomicMin(&g_level[g_graph_edges[tid].out_vertex], new_depth) > new_depth) {
             //atomic min returns the old value and updates the first argument with the minimum.
             //if the depth seen by a node is higher than the current new depth, we should try more depths
             // printf("Update: for tid %d , updating out vertex %d when in vertex is %d. New level is of out vertex is %d\n", tid, 
@@ -58,7 +56,11 @@ __global__ void reverse_edgelist( Node* g_graph_nodes,
 
         int new_depth = *g_depth + 1;
         g_graph_visited[g_graph_edges[tid].in_vertex] = true;
-        if (nonAtomicMin(&g_level[g_graph_edges[tid].in_vertex], new_depth) > new_depth) {
+        // if (g_level[g_graph_edges[tid].in_vertex] > new_depth) {
+		// 	g_level[g_graph_edges[tid].in_vertex] = new_depth;
+		// 	*g_over = true;
+		// }
+        if (atomicMin(&g_level[g_graph_edges[tid].in_vertex], new_depth) > new_depth) {
             //atomic min returns the old value
             //if the depth seen by a node is higher than the current new depth, we should try more depths
             *g_over=true;
@@ -89,7 +91,11 @@ __global__ void vertex_push( Node* g_graph_nodes,
             // printf("\nAt %d. Before checking vertex %d , graph_visited %c , level %d\n", tid, neighbour_index, g_graph_visited[neighbour_index], g_level[neighbour_index]);
             if (g_graph_visited[neighbour_index] != true) {
                 g_graph_visited[neighbour_index] = true;
-                if (nonAtomicMin(&g_level[neighbour_index], new_depth) > new_depth) {
+                // if (g_level[neighbour_index] > new_depth) {
+                //     g_level[neighbour_index] = new_depth;
+                //     *g_over = true;
+                // }
+                if (atomicMin(&g_level[neighbour_index], new_depth) > new_depth) {
                     //atomic min returns the old value
                     //if the depth seen by a node is higher than the current new depth, we should try more depths
                     // printf("At %d. Updating vertex %d to depth %d. \n", tid, neighbour_index, g_level[neighbour_index]);

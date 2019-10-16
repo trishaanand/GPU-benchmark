@@ -114,6 +114,8 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		// start timer
 		gettimeofday(&t1, NULL);
 		do{
+			struct timeval t3, t4;
+			gettimeofday(&t3, NULL);
 			h_over = false;
 			h_depth = h_depth + 1;
 			// printf("\nNew iterations : traversing current depth %d \n", h_depth);
@@ -137,6 +139,10 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 			cudaDeviceSynchronize(); 
 
 			cudaMemcpy( &h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
+			gettimeofday(&t4, NULL);
+			double iteration_time = (t4.tv_sec - t3.tv_sec) * 1000000000.0;      // sec to ns
+			iteration_time += (t4.tv_usec - t3.tv_usec) * 1000.0;   // us to ns
+			printf("Iteration %d, time (ns) : %g\n", h_depth, iteration_time);
 		}while(h_over);
 		// stop timer
 		gettimeofday(&t2, NULL);
@@ -147,8 +153,16 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		printf("Kernel time : %f ns\n", elapsedTime);
 		// printf("No of iterations : %d\n",h_depth);
 
-		cudaError err = cudaMemcpy((void *) h_level, (void *) d_level, no_of_nodes*sizeof(int), cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize(); 
+		// cudaError err = cudaMemcpy((void *) h_level, (void *) d_level, no_of_nodes*sizeof(int), cudaMemcpyDeviceToHost);
+		// cudaDeviceSynchronize(); 
+		// printf("New depths are : \n");
+		// int max = 0;
+		// for (int i=0; i<no_of_nodes; i++) {
+		// 	printf("%d : %d, ", i, h_level[i]);
+		// 	if (h_level[i] != INT_MAX && h_level[i]>max) max = h_level[i];
+		// }
+		// printf("\nMaximum depth seen is %d\n",max);
+
 		
 		//--4 release cuda resources.
 		cudaFree(d_graph_nodes);
@@ -240,6 +254,8 @@ try{
 	// start timer
 	gettimeofday(&t1, NULL);
 	do{
+		struct timeval t3, t4;
+		gettimeofday(&t3, NULL);
 		h_over = false;
 		h_depth = h_depth + 1;
 		// printf("\n\nNew iterations : traversing current depth %d \n", h_depth);
@@ -263,6 +279,10 @@ try{
 		cudaDeviceSynchronize(); 
 
 		cudaMemcpy( &h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
+		gettimeofday(&t4, NULL);
+		double iteration_time = (t4.tv_sec - t3.tv_sec) * 1000000000.0;      // sec to ns
+		iteration_time += (t4.tv_usec - t3.tv_usec) * 1000.0;   // us to ns
+		printf("Iteration %d, time (ns) : %g\n", h_depth, iteration_time);
 	}while(h_over);
 	// stop timer
 	gettimeofday(&t2, NULL);
@@ -377,6 +397,8 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		// start timer
 		gettimeofday(&t1, NULL);
 		do{
+			struct timeval t3, t4;
+			gettimeofday(&t3, NULL);
 			h_over = false;
 			h_depth = h_depth + 1;
 			// printf("\nNew iterations : traversing current depth %d \n", h_depth);
@@ -401,6 +423,10 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 			cudaDeviceSynchronize(); 
 	
 			cudaMemcpy( &h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
+			gettimeofday(&t4, NULL);
+			double iteration_time = (t4.tv_sec - t3.tv_sec) * 1000000000.0;      // sec to ns
+			iteration_time += (t4.tv_usec - t3.tv_usec) * 1000.0;   // us to ns
+			printf("Iteration %d, time (ns) : %g\n", h_depth, iteration_time);
 		}while(h_over);
 		// stop timer
 		gettimeofday(&t2, NULL);
@@ -517,6 +543,8 @@ void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		// start timer
 		gettimeofday(&t1, NULL);
 		do{
+			struct timeval t3, t4;
+			gettimeofday(&t3, NULL);
 			h_over = false;
 			h_depth = h_depth + 1;
 			// printf("\nNew iterations : traversing current depth %d \n", h_depth);
@@ -541,6 +569,10 @@ void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list
 			cudaDeviceSynchronize(); 
 	
 			cudaMemcpy( &h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
+			gettimeofday(&t4, NULL);
+			double iteration_time = (t4.tv_sec - t3.tv_sec) * 1000000000.0;      // sec to ns
+			iteration_time += (t4.tv_usec - t3.tv_usec) * 1000.0;   // us to ns
+			printf("Iteration %d, time (ns) : %g\n", h_depth, iteration_time);
 		}while(h_over);
 		// stop timer
 		gettimeofday(&t2, NULL);
@@ -782,10 +814,10 @@ int main(int argc, char * argv[])
 		}
 		
 		std::cout<<"Edgelist Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		// for (int i=0; i<6; i++)
 			run_bfs_gpu_edgelist(no_of_nodes, h_graph_nodes,edge_list_size,h_graph_edges, h_graph_visited, &time_taken);	
 		std::cout<<std::endl<<"Reverse Edgelist Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		// for (int i=0; i<5; i++)
 			run_bfs_gpu_reverse_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_visited, &time_taken);	
 
 		num_of_blocks = 1;
@@ -799,10 +831,10 @@ int main(int argc, char * argv[])
 		}
 
 		std::cout<<std::endl<<"Vertex Push Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		// for (int i=0; i<5; i++)
 			run_bfs_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken, h_graph_visited);
 		std::cout<<std::endl<<"Vertex Pull Implementation"<<std::endl;
-		for (int i=0; i<5; i++)	
+		// for (int i=0; i<5; i++)	
 			run_bfs_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
 		
 		//release host memory		
