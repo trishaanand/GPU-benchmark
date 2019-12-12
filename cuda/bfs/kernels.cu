@@ -123,6 +123,22 @@ __global__ void vertex_pull(  Node* g_graph_nodes,
     } 
 }
 
-   
+// __global__ void increment_no_of_edges( float* g_A, float* g_B, float* g_C, int *no_of_nodes) {
+//     int tid = blockIdx.x * blockDim.x + threadIdx.x;
+//     int loc_nodes = *no_of_nodes;
+//     if (tid < loc_nodes) {
+//         g_C[tid] = g_A[tid] + g_B[tid];
+//     }
+// }   
+
+__global__ void increment_no_of_edges( Node* g_graph_nodes, int* no_of_nodes ) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int loc_nodes = *no_of_nodes;
+
+    if (tid < loc_nodes) {
+        g_graph_nodes[tid].no_of_edges += 1;
+    }
+} 
 
 #endif
+

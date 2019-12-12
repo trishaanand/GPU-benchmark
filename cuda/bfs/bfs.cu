@@ -140,6 +140,7 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		}while(h_over);
 		// stop timer
 		gettimeofday(&t2, NULL);
+		printf("Depth : %d\n", h_depth);
 
 		// compute and print the elapsed time in millisec
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000000000.0;      // sec to ns
@@ -147,8 +148,8 @@ void run_bfs_gpu_edgelist(int no_of_nodes, Node *h_graph_nodes, int edge_list_si
 		printf("Kernel time : %f ns\n", elapsedTime);
 		// printf("No of iterations : %d\n",h_depth);
 
-		cudaError err = cudaMemcpy((void *) h_level, (void *) d_level, no_of_nodes*sizeof(int), cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize(); 
+		// cudaError err = cudaMemcpy((void *) h_level, (void *) d_level, no_of_nodes*sizeof(int), cudaMemcpyDeviceToHost);
+		// cudaDeviceSynchronize(); 
 		// printf("New depths are : \n");
 		// int max = 0;
 		// for (int i=0; i<no_of_nodes; i++) {
@@ -281,7 +282,7 @@ try{
 	elapsedTime += (t2.tv_usec - t1.tv_usec) * 1000.0;   // us to ns
 	printf("Kernel time : %f ns\n", elapsedTime);
 	
-	// printf("No of iterations : %d\n",h_depth);
+	printf("No of iterations : %d\n",h_depth);
 
 	// cudaMemcpy(h_level, d_level, sizeof(int)*no_of_nodes, cudaMemcpyHostToDevice);
 	// cudaDeviceSynchronize(); 
@@ -376,6 +377,29 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 	// printf("\n\nusing %d multiprocessors\n",properties.multiProcessorCount);
 	// printf("max threads per processor: %d\n",properties.maxThreadsPerMultiProcessor);
 	// printf("runing with dim3 num_of_blocks %d, num_of_threads_per_block %d\n\n", num_of_blocks, num_of_threads_per_block);
+
+	float *h_A = (float *) malloc(no_of_nodes * sizeof(float));
+	float *h_B = (float *) malloc(no_of_nodes * sizeof(float));
+	float *h_C = (float *) malloc(no_of_nodes * sizeof(float));
+
+	for (int i=0; i< no_of_nodes; i++) {
+		h_A[i] = 1;	
+		h_B[i] = 2;
+		h_C[i] = 0;
+	}
+
+	// float *d_A;
+	// cudaMalloc((void**) &d_A, sizeof(float));
+	// cudaMemcpy(d_A, h_A, sizeof(float)*no_of_nodes, cudaMemcpyHostToDevice);
+
+	// float *d_B;
+	// cudaMalloc((void**) &d_B, sizeof(float));
+	// cudaMemcpy(d_B, h_B, sizeof(float)*no_of_nodes, cudaMemcpyHostToDevice);
+
+	// float *d_C;
+	// cudaMalloc((void**) &d_C, sizeof(float));
+	// cudaMemcpy(d_C, h_C, sizeof(float)*no_of_nodes, cudaMemcpyHostToDevice);
+
 	
 	try{
 		//First run BFS once with level 0 for all nodes who dont have reverse neighbours
@@ -385,30 +409,34 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		// start timer
 		gettimeofday(&t1, NULL);
 		do{
-			h_over = false;
-			h_depth = h_depth + 1;
-			// printf("\nNew iterations : traversing current depth %d \n", h_depth);
-			cudaMemcpy( d_depth, &h_depth, sizeof(int), cudaMemcpyHostToDevice) ;
-			cudaMemcpy( d_over, &h_over, sizeof(char), cudaMemcpyHostToDevice) ;
+			// h_over = false;
+			// h_depth = h_depth + 1;
+			// // printf("\nNew iterations : traversing current depth %d \n", h_depth);
+			// cudaMemcpy( d_depth, &h_depth, sizeof(int), cudaMemcpyHostToDevice) ;
+			// cudaMemcpy( d_over, &h_over, sizeof(char), cudaMemcpyHostToDevice) ;
 			
-			vertex_push<<< grid, threads, 0 >>>( d_graph_nodes,
-												d_graph_edges, 
-												d_no_of_nodes,
-												d_over,
-												d_depth,
-												d_level,
-												d_neighbours,
-												d_graph_visited);
-			cudaError err = cudaGetLastError();
-			if ( cudaSuccess != err )
-			{
-				fprintf( stderr, "cudaCheckError() for kernel launch failed with error : %s\n",
-							cudaGetErrorString( err ) );
-				exit( -1 );
-			}
-			cudaDeviceSynchronize(); 
+			// vertex_push<<< grid, threads, 0 >>>( d_graph_nodes,
+			// 									d_graph_edges, 
+			// 									d_no_of_nodes,
+			// 									d_over,
+			// 									d_depth,
+			// 									d_level,
+			// 									d_neighbours,
+			// 									d_graph_visited);
+			// cudaError err = cudaGetLastError();
+			// if ( cudaSuccess != err )
+			// {
+			// 	fprintf( stderr, "cudaCheckError() for kernel launch failed with error : %s\n",
+			// 				cudaGetErrorString( err ) );
+			// 	exit( -1 );
+			// }
+			// cudaDeviceSynchronize(); 
 	
-			cudaMemcpy( &h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
+			// cudaMemcpy( &h_over, d_over, sizeof(char), cudaMemcpyDeviceToHost) ;
+
+			h_over = false;
+			// increment_no_of_edges<<<grid, threads, 0 >>>(d_A, d_B, d_C, d_no_of_nodes);
+			increment_no_of_edges<<<grid, threads, 0 >>>(d_graph_nodes, d_no_of_nodes);
 		}while(h_over);
 		// stop timer
 		gettimeofday(&t2, NULL);
@@ -685,7 +713,7 @@ int main(int argc, char * argv[])
 		// no_of_nodes = 1025;
 		printf("Number of nodes read are : %d\n", no_of_nodes);
 		edge_list_size = read_and_return_no_of_edges(input_fe);
-		printf("Number of edges read are : %d\n", edge_list_size);
+		// printf("Number of edges read are : %d\n", edge_list_size);
 		printf("Starting node for BFS is : %d\n", bfs_starting_node);
 		
 		//Read in Graph from a file
@@ -789,12 +817,12 @@ int main(int argc, char * argv[])
 			num_of_threads_per_block = MAX_THREADS_PER_BLOCK; 
 		}
 		
-		std::cout<<"Edgelist Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
-			run_bfs_gpu_edgelist(no_of_nodes, h_graph_nodes,edge_list_size,h_graph_edges, h_graph_visited, &time_taken);	
-		std::cout<<std::endl<<"Reverse Edgelist Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
-			run_bfs_gpu_reverse_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_visited, &time_taken);	
+		// std::cout<<"Edgelist Implementation"<<std::endl;
+		// for (int i=0; i<6; i++)
+		// 	run_bfs_gpu_edgelist(no_of_nodes, h_graph_nodes,edge_list_size,h_graph_edges, h_graph_visited, &time_taken);	
+		// std::cout<<std::endl<<"Reverse Edgelist Implementation"<<std::endl;
+		// for (int i=0; i<5; i++)
+		// 	run_bfs_gpu_reverse_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_visited, &time_taken);	
 
 		num_of_blocks = 1;
 		// num_of_threads_per_block = no_of_nodes;
@@ -809,9 +837,9 @@ int main(int argc, char * argv[])
 		std::cout<<std::endl<<"Vertex Push Implementation"<<std::endl;
 		for (int i=0; i<5; i++)
 			run_bfs_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken, h_graph_visited);
-		std::cout<<std::endl<<"Vertex Pull Implementation"<<std::endl;
-		for (int i=0; i<5; i++)	
-			run_bfs_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
+		// std::cout<<std::endl<<"Vertex Pull Implementation"<<std::endl;
+		// for (int i=0; i<5; i++)	
+		// 	run_bfs_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
 		
 		//release host memory		
 		free(h_graph_nodes);
