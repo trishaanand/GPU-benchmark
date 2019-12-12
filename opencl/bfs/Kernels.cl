@@ -154,9 +154,9 @@ __kernel void vertex_pull( const __global Node* g_graph_nodes,
 		int max = starting + g_graph_nodes[tid].no_of_reverse_edges;
 		for (int i=starting; i<max; i++ ) {
 			int neighbour_index = g_reverse_neighbours[i];
-			printf("For tid %d, level of neighbour %d is %d  and is being compared to %d\n", tid, neighbour_index, g_level[neighbour_index], *g_depth);
+			//printf("For tid %d, level of neighbour %d is %d  and is being compared to %d\n", tid, neighbour_index, g_level[neighbour_index], *g_depth);
 			if (g_level[neighbour_index] == *g_depth) {
-				printf("Inside kernel processing new rank %d for node index %d\n", new_depth, tid);
+				//printf("Inside kernel processing new rank %d for node index %d\n", new_depth, tid);
 				g_level[tid] = new_depth;
 				*g_over = true;
 				g_graph_visited[tid] = true;
@@ -166,3 +166,18 @@ __kernel void vertex_pull( const __global Node* g_graph_nodes,
 	}	
 }
 
+// __kernel void increment_no_of_edges( __global float* g_A, __global float* g_B, __global float* g_C,  const int no_of_nodes ) {
+//     int tid = get_global_id(0);
+// 	int loc_nodes = no_of_nodes;
+//     if (tid < loc_nodes) {
+//         g_C[tid] = g_A[tid] + g_B[tid];
+//     }
+// } 
+
+__kernel void increment_no_of_edges( __global Node* g_graph_nodes, const int no_of_nodes ) {
+    int tid = get_global_id(0);
+	int loc_nodes = no_of_nodes;
+    if (tid < loc_nodes) {
+        g_graph_nodes[tid].no_of_edges += 1;
+    }
+} 

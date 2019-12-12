@@ -500,7 +500,7 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 	try{
 		//--1 transfer data from host to device
 		_clInit();	
-		d_graph_nodes = _clMalloc(no_of_nodes*sizeof(Node), h_graph_nodes);
+		d_graph_nodes = _clMallocRW(no_of_nodes*sizeof(Node), h_graph_nodes);
 		d_graph_edges = _clMalloc(edge_list_size*sizeof(Edge), h_graph_edges);
 		d_neighbours = _clMalloc(edge_list_size*sizeof(int), h_neighbours);
 		d_graph_visited = _clMallocRW(no_of_nodes*sizeof(char), h_graph_visited);
@@ -516,6 +516,26 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		_clMemcpyH2D(d_neighbours, edge_list_size*sizeof(int), h_neighbours);
 		_clMemcpyH2D(d_graph_visited, no_of_nodes*sizeof(char), h_graph_visited);
 			
+
+		// float *h_A = (float *) malloc(no_of_nodes * sizeof(float));
+		// float *h_B = (float *) malloc(no_of_nodes * sizeof(float));
+		// float *h_C = (float *) malloc(no_of_nodes * sizeof(float));
+
+		// for (int i=0; i< no_of_nodes; i++) {
+		// 	h_A[i] = 1;	
+		// 	h_B[i] = 2;
+		// 	h_C[i] = 0;
+		// }
+
+		// cl_mem d_A, d_B, d_C;
+		// d_A = _clMallocRW(no_of_nodes*sizeof(float), h_A);
+		// d_B = _clMallocRW(no_of_nodes*sizeof(float), h_B);
+		// d_C = _clMallocRW(no_of_nodes*sizeof(float), h_C);
+
+		// _clMemcpyH2D(d_A, no_of_nodes*sizeof(float), h_A);
+		// _clMemcpyH2D(d_B, no_of_nodes*sizeof(float), h_B);
+		// _clMemcpyH2D(d_C, no_of_nodes*sizeof(float), h_C);
+		
 		//--2 invoke kernel
 #ifdef	PROFILING
 		timer kernel_timer;
@@ -548,58 +568,28 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 			_clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
 			
 			_clMemcpyD2H(d_over,sizeof(char), &h_over);
+
+			// h_over = false;
+			// int kernel_id = 6;
+			// int kernel_idx = 0;
+			// // _clSetArgs(kernel_id, kernel_idx++, d_A);
+			// // _clSetArgs(kernel_id, kernel_idx++, d_B);
+			// // _clSetArgs(kernel_id, kernel_idx++, d_C);
+			// _clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
+			// _clSetArgs(kernel_id, kernel_idx++, &no_of_nodes, sizeof(int));
+			
+			// _clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
+
 		}while(h_over);
 			
-		// //Now run BFS for all the graph nodes which were disconnected from the above.
-		// int num_of_starting_points = 0;
-		// for (int i=0; i<no_of_nodes; i++) {
-		// 	if (h_graph_visited[i] != true) {
-		// 		num_of_starting_points++;
-		// 		//Start BFS from the ith node
-		// 		h_level[i] = 0;
-		// 		h_graph_visited[i] = true;
-		// 		_clMemcpyH2D(d_graph_visited, no_of_nodes*sizeof(char), h_graph_visited);
-		// 		_clMemcpyH2D(d_level, no_of_nodes*sizeof(int), h_level);
-		// 		h_depth = -1;
-				
-		// 		do{
-		// 			h_over = false;
-		// 			h_depth = h_depth + 1;
-					
-		// 			_clMemcpyH2D(d_over, sizeof(char), &h_over);
-		// 			_clMemcpyH2D(d_depth, sizeof(int), &h_depth);
-		// 			//--kernel 0
-		// 			int kernel_id = 4;
-		// 			int kernel_idx = 0;
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_graph_nodes);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_graph_edges);
-		// 			_clSetArgs(kernel_id, kernel_idx++, &no_of_nodes, sizeof(int));
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_over);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_depth);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_level);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_neighbours);
-		// 			_clSetArgs(kernel_id, kernel_idx++, d_graph_visited);
-					
-		// 			//int work_items = no_of_nodes;
-		// 			_clInvokeKernel(kernel_id, no_of_nodes, work_group_size);
-					
-		// 			_clMemcpyD2H(d_over,sizeof(char), &h_over);
-		// 		}while(h_over);
-
-		// 		//Update the h_graph_visited array
-		// 		_clMemcpyD2H(d_graph_visited,no_of_nodes*sizeof(char), h_graph_visited);
-		// 		//Update the h_level array
-		// 		_clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_level);
-		// 	}
-		// }
-
 		_clFinish();
 		// std::cout<<"Num iterations : "<<h_depth<<std::endl;
 #ifdef	PROFILING
 		kernel_timer.stop();
 		kernel_time = kernel_timer.getTimeInNanoSeconds();
 		*time_taken = kernel_time;
-			
+		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;		
+
 #endif
 		//--3 transfer data from device to host
 		// _clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_level);
@@ -612,7 +602,7 @@ void run_bfs_gpu_vertex_push(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		// std::cout<<std::endl;
 		// std::cout<<"Maximum depth seen is "<<max<<std::endl;
 
-		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;	
+		
 		//--4 release cl resources.
 		_clFree(d_graph_nodes);
 		_clFree(d_graph_edges);
@@ -764,20 +754,19 @@ void run_bfs_gpu_vertex_pull(int no_of_nodes, Node* h_graph_nodes, int edge_list
 		kernel_timer.stop();
 		kernel_time = kernel_timer.getTimeInNanoSeconds();
 		*time_taken = kernel_time;
+		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;
 			
 #endif
-		_clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_level);
-		std::cout<<"New depths are : "<<std::endl;
-		int max = 0;
-		for (int i=0; i<no_of_nodes; i++) {
-			std::cout<<i<<" : "<<h_level[i]<<", ";
-			if (h_level[i] != INT_MAX && h_level[i]>max) max = h_level[i];
-		}
-		std::cout<<std::endl;
-		std::cout<<"Maximum depth seen is "<<max<<std::endl;
-
-
-		std::cout<<"kernel time(s):"<<kernel_time<<std::endl;	
+		// _clMemcpyD2H(d_level,no_of_nodes*sizeof(int), h_level);
+		// std::cout<<"New depths are : "<<std::endl;
+		// int max = 0;
+		// for (int i=0; i<no_of_nodes; i++) {
+		// 	std::cout<<i<<" : "<<h_level[i]<<", ";
+		// 	if (h_level[i] != INT_MAX && h_level[i]>max) max = h_level[i];
+		// }
+		// std::cout<<std::endl;
+		// std::cout<<"Maximum depth seen is "<<max<<std::endl;
+			
 		//--4 release cl resources.
 		_clFree(d_graph_nodes);
 		_clFree(d_graph_edges);
@@ -977,10 +966,10 @@ int main(int argc, char * argv[])
 		work_group_size = num_of_threads_per_block;
 		
 		std::cout<<"Edgelist Implementation"<<std::endl;
-		for (int i=0; i<6; i++)
+		// for (int i=0; i<3; i++)
 			run_bfs_gpu_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, &time_taken);	
 		std::cout<<"Reverse Edgelist Implementation"<<std::endl;
-		for (int i=0; i<5; i++)
+		// for (int i=0; i<2; i++)
 			run_bfs_gpu_reverse_edgelist(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, h_graph_mask, h_updating_graph_mask, h_graph_visited, &time_taken);
 
 		num_of_blocks = 1;
@@ -995,12 +984,12 @@ int main(int argc, char * argv[])
 		work_group_size = num_of_threads_per_block;
 		
 
-		// std::cout<<"Vertex Push Implementation"<<std::endl;
+		std::cout<<"Vertex Push Implementation"<<std::endl;
 		// for (int i=0; i<5; i++)
-		// 	run_bfs_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken, h_graph_visited);
-		// std::cout<<"Vertex Pull Implementation"<<std::endl;
-		// for (int i=0; i<5; i++)	
-			// run_bfs_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
+			run_bfs_gpu_vertex_push(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, neighbours, &time_taken, h_graph_visited);
+		std::cout<<"Vertex Pull Implementation"<<std::endl;
+		// for (int i=0; i<2; i++)	
+			run_bfs_gpu_vertex_pull(no_of_nodes,h_graph_nodes,edge_list_size,h_graph_edges, reverse_neighbours, &time_taken, h_graph_visited);	
 		//---------------------------------------------------------
 		//--cpu entry
 		// initalize the memory again
