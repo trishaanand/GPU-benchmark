@@ -1,0 +1,14 @@
+#!/bin/sh
+#SBATCH --time=00:30:00
+#SBATCH -C TitanX
+#SBATCH --gres=gpu:1
+#SBATCH -N 1
+
+COMPUTE_PROFILE=1
+
+. /etc/bashrc
+. /etc/profile.d/modules.sh
+
+module load cuda70
+
+COMPUTE_PROFILE=1 COMPUTE_PROFILE_CONFIG=nvvp.cfg ./bfs 0 /var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.e /var/scratch/alvarban/BSc_2k19/graphs/G500/graph500-10.v
