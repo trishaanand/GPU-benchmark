@@ -6,7 +6,9 @@
 #ifndef _CL_HELPER_
 #define _CL_HELPER_
 
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #include <CL/cl.h>
+// #include "/cm/shared/package/intel-opencl/intel/opencl-1.2-5.0.0.57/include/CL/cl.h"
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -19,6 +21,7 @@ using std::endl;
 using std::cout;
 //#pragma OPENCL EXTENSION cl_nv_compiler_options:enable
 #define WORK_DIM 2	//work-items dimensions
+
 
 struct oclHandleStruct
 {
@@ -164,7 +167,7 @@ void _clInit()
         throw (string("InitCL()::Error: Getting platform ids (clGetPlatformIDs)"));
 
     /* Select the target platform. Default: first platform */
-    targetPlatform = allPlatforms[0];
+    targetPlatform = allPlatforms[1];
     for (int i = 0; i < numPlatforms; i++)
     {
         char pbuff[128];
@@ -176,7 +179,7 @@ void _clInit()
         if (resultCL != CL_SUCCESS)
             throw (string("InitCL()::Error: Getting platform info (clGetPlatformInfo)"));
 
-		printf("vedor is %s\n",pbuff);
+		printf("vendor is %s\n",pbuff);
 
     }
     free(allPlatforms);
