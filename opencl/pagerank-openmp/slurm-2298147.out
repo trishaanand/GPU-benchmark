@@ -1,0 +1,23 @@
+Number of nodes read are : 1024
+Number of edges read are : 10551
+
+Edgelist Implementation
+kernel time(s):1.46699e+08
+kernel time(s):1.28962e+07
+kernel time(s):1.25127e+07
+kernel time(s):1.2695e+07
+kernel time(s):1.23783e+07
+
+Vertex Push Implementation
+kernel time(s):1.47122e+07
+kernel time(s):1.44729e+07
+kernel time(s):1.46133e+07
+kernel time(s):1.42816e+07
+kernel time(s):1.46181e+07
+
+Vertex Pull Implementation
+kernel time(s):4.48202e+06
+kernel time(s):4.46788e+06
+kernel time(s):4.61727e+06
+kernel time(s):4.58185e+06
+kernel time(s):4.41201e+06
